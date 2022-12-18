@@ -1,4 +1,5 @@
 import os
+import subprocess
 from pprint import pprint
 
 import can
@@ -12,9 +13,13 @@ obd_message = db.get_message_by_name('OBD2')
 #     if signal.choices:
 #         pprint(signal.choices, indent=2)
 can_bus = None
+if not os.path.exists('/sys/class/net/vcan0'):
+    script_dir = f'{os.getcwd()}/vcan.sh'
+    with subprocess.Popen(['bash', script_dir], stdout=subprocess.PIPE) as proc:
+        print(proc.stdout.read())
 if os.path.exists('/sys/class/net/vcan0'):
     print('Using virtual CAN')
-    can_bus = can.interface.Bus('vcan0', bustype='socketcan')
+    can_bus: can.Bus = can.Bus('vcan0', bustype='socketcan')
 content = {
     'length': 3,
     'response': 4,

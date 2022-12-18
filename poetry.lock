@@ -23,6 +23,14 @@ wrapt = [
 ]
 
 [[package]]
+name = "async-timeout"
+version = "4.0.2"
+description = "Timeout context manager for asyncio programs"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[[package]]
 name = "attrs"
 version = "22.1.0"
 description = "Classes Without Boilerplate"
@@ -40,6 +48,30 @@ tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>
 name = "bitstruct"
 version = "8.15.1"
 description = "This module performs conversions between Python values and C bit field structs represented as Python byte strings."
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
+name = "bleak"
+version = "0.19.5"
+description = "Bluetooth Low Energy platform Agnostic Klient"
+category = "main"
+optional = false
+python-versions = ">=3.7,<4.0"
+
+[package.dependencies]
+async-timeout = ">=3.0.0,<5"
+bleak-winrt = {version = ">=1.2.0,<2.0.0", markers = "platform_system == \"Windows\""}
+dbus-fast = {version = ">=1.22.0,<2.0.0", markers = "platform_system == \"Linux\""}
+pyobjc-core = {version = ">=8.5.1,<9.0.0", markers = "platform_system == \"Darwin\""}
+pyobjc-framework-CoreBluetooth = {version = ">=8.5.1,<9.0.0", markers = "platform_system == \"Darwin\""}
+pyobjc-framework-libdispatch = {version = ">=8.5.1,<9.0.0", markers = "platform_system == \"Darwin\""}
+
+[[package]]
+name = "bleak-winrt"
+version = "1.2.0"
+description = "Python WinRT bindings for Bleak"
 category = "main"
 optional = false
 python-versions = "*"
@@ -81,6 +113,17 @@ description = "Cross-platform colored terminal text."
 category = "dev"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
+
+[[package]]
+name = "dbus-fast"
+version = "1.82.0"
+description = "A faster version of dbus-next"
+category = "main"
+optional = false
+python-versions = ">=3.7,<4.0"
+
+[package.dependencies]
+async-timeout = {version = ">=3.0.0", markers = "python_version < \"3.11\""}
 
 [[package]]
 name = "dill"
@@ -167,6 +210,18 @@ optional = false
 python-versions = ">=3.8"
 
 [[package]]
+name = "obd"
+version = "0.7.1"
+description = "Serial module for handling live sensor data from a vehicle's OBD-II port"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+pint = ">=0.7.0,<0.8.0"
+pyserial = ">=3.0.0,<4.0.0"
+
+[[package]]
 name = "packaging"
 version = "21.3"
 description = "Core utilities for Python packages"
@@ -176,6 +231,14 @@ python-versions = ">=3.6"
 
 [package.dependencies]
 pyparsing = ">=2.0.2,<3.0.5 || >3.0.5"
+
+[[package]]
+name = "pint"
+version = "0.7.2"
+description = "Physical quantities module"
+category = "main"
+optional = false
+python-versions = "*"
 
 [[package]]
 name = "platformdirs"
@@ -202,6 +265,24 @@ dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
+name = "PyBluez"
+version = "0.23"
+description = ""
+category = "main"
+optional = false
+python-versions = "*"
+develop = false
+
+[package.extras]
+ble = ["gattlib (==0.20150805)"]
+
+[package.source]
+type = "git"
+url = "https://github.com/pybluez/pybluez"
+reference = "0.23"
+resolved_reference = "0998c40ebad69b3c8e2b3e90f1fd0c0879ce6a57"
+
+[[package]]
 name = "pylint"
 version = "2.15.6"
 description = "python code static checker"
@@ -225,6 +306,48 @@ spelling = ["pyenchant (>=3.2,<4.0)"]
 testutils = ["gitpython (>3)"]
 
 [[package]]
+name = "pyobjc-core"
+version = "8.5.1"
+description = "Python<->ObjC Interoperability Module"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[[package]]
+name = "pyobjc-framework-cocoa"
+version = "8.5.1"
+description = "Wrappers for the Cocoa frameworks on macOS"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+pyobjc-core = ">=8.5.1"
+
+[[package]]
+name = "pyobjc-framework-corebluetooth"
+version = "8.5.1"
+description = "Wrappers for the framework CoreBluetooth on macOS"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+pyobjc-core = ">=8.5.1"
+pyobjc-framework-Cocoa = ">=8.5.1"
+
+[[package]]
+name = "pyobjc-framework-libdispatch"
+version = "8.5.1"
+description = "Wrappers for libdispatch on macOS"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+pyobjc-core = ">=8.5.1"
+
+[[package]]
 name = "pyparsing"
 version = "3.0.9"
 description = "pyparsing module - Classes and methods to define and execute parsing grammars"
@@ -234,6 +357,17 @@ python-versions = ">=3.6.8"
 
 [package.extras]
 diagrams = ["jinja2", "railroad-diagrams"]
+
+[[package]]
+name = "pyserial"
+version = "3.5"
+description = "Python Serial Port Extension"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.extras]
+cp2110 = ["hidapi"]
 
 [[package]]
 name = "pytest"
@@ -340,16 +474,20 @@ python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "2ce562cfd4b8c54928f339471cbc49d87073e979edeff168423418b6e69f0a87"
+content-hash = "93a7822b734ca115b362eac4097d3c52fc744d3899cd53af3c714171ea13871b"
 
 [metadata.files]
 argparse-addons = []
 astroid = []
+async-timeout = []
 attrs = []
 bitstruct = []
+bleak = []
+bleak-winrt = []
 can-decoder = []
 cantools = []
 colorama = []
+dbus-fast = []
 dill = []
 diskcache = []
 exceptiongroup = []
@@ -365,17 +503,28 @@ lazy-object-proxy = []
 mccabe = []
 msgpack = []
 numpy = []
+obd = []
 packaging = [
     {file = "packaging-21.3-py3-none-any.whl", hash = "sha256:ef103e05f519cdc783ae24ea4e2e0f508a9c99b2d4969652eed6a2e1ea5bd522"},
     {file = "packaging-21.3.tar.gz", hash = "sha256:dd47c42927d89ab911e606518907cc2d3a1f38bbd026385970643f9c5b8ecfeb"},
 ]
+pint = []
 platformdirs = []
 pluggy = [
     {file = "pluggy-1.0.0-py2.py3-none-any.whl", hash = "sha256:74134bbf457f031a36d68416e1509f34bd5ccc019f0bcc952c7b909d06b37bd3"},
     {file = "pluggy-1.0.0.tar.gz", hash = "sha256:4224373bacce55f955a878bf9cfa763c1e360858e330072059e10bad68531159"},
 ]
+PyBluez = []
 pylint = []
+pyobjc-core = []
+pyobjc-framework-cocoa = []
+pyobjc-framework-corebluetooth = []
+pyobjc-framework-libdispatch = []
 pyparsing = []
+pyserial = [
+    {file = "pyserial-3.5-py2.py3-none-any.whl", hash = "sha256:c4451db6ba391ca6ca299fb3ec7bae67a5c55dde170964c7a14ceefec02f2cf0"},
+    {file = "pyserial-3.5.tar.gz", hash = "sha256:3c77e014170dfffbd816e6ffc205e9842efb10be9f58ec16d3e8675b4925cddb"},
+]
 pytest = []
 python-can = []
 pywin32 = []
