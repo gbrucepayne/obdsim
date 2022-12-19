@@ -9,7 +9,9 @@ from cantools.database import Database as CanDatabase
 from cantools.database import Message as CanMessage
 from cantools.database import load_file as load_can_database
 
-DBC_FILE = os.getenv('DBC_FILE', './dbc/CSS-Electronics-OBD2-v1.4.1.dbc')
+from .obd_signal import ObdSignal
+
+DBC_FILE = os.getenv('DBC_FILE', './dbc/python-obd.dbc')
 DBC_MSG_NAME = os.getenv('DBC_MSG_NAME', 'OBD2_RESPONSE')
 
 _log = logging.getLogger(__name__)
@@ -89,27 +91,27 @@ class ObdSimulator:
             raise ValueError('OBD request or db missing mode')
         if request['service'] == 1:
             _log.debug(f'Simulating mode 1 response')
-            if 'ParameterID_Service01' not in request:
-                raise ValueError('Missing PID')
-            pid = request['ParameterID_Service01']
+            if 'PID_MODE_01' not in request:
+                raise ValueError('Missing PID for Mode 1')
+            pid = request['PID_MODE_01']
             response = {
                 'response': 4,
                 'service': 1,
-                'ParameterID_Service01': pid,
+                'PID_MODE_01': pid,
             }
             if pid == 0:
                 response['length'] = 6
-                response['S1_PID_00_PIDsSupported_01_20'] = pids_01_20()
+                response['PIDS_A'] = pids_a_supported()
             elif pid == 0xC:
-                if 'rpm' not in self.signals:
-                    self.signals['rpm'] = 1165
+                if 'RPM' not in self.signals:
+                    self.signals['RPM'] = 1165
                 response['length'] = 4
-                response['S1_PID_0C_EngineRPM'] = self.signals['rpm']
+                response['RPM'] = self.signals['RPM']
             elif pid == 0xD:
-                if 'speed' not in self.signals:
-                    self.signals['speed'] = 50
+                if 'SPEED' not in self.signals:
+                    self.signals['SPEED'] = 50
                 response['length'] = 3
-                response['S1_PID_0D_VehicleSpeed'] = self.signals['speed']
+                response['SPEED'] = self.signals['SPEED']
             else:
                 _log.warning(f'Unhandled Mode 01 PID {pid}')
                 response = None
@@ -122,8 +124,11 @@ class ObdSimulator:
             _log.warning(f'No response for {request}')
 
 
-def pids_01_20() -> int:
+def pids_a_supported() -> int:
     """"""
-    # RPM 0x0C, speed 0x0D
-    binary = '00000000000110000000000000000000'
-    return int(binary, 2)
+    supported_signals = ['RPM', 'SPEED']
+    bitmask = 0
+    for sig in supported_signals:
+        pid = ObdSignal.get_pid_by_name(sig)
+        bitmask = bitmask | 1 << (32 - pid)
+    return bitmask

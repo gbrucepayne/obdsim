@@ -1,3 +1,7 @@
+"""BLE Adapter for OBDII Scanner.
+
+Work in progress...
+"""
 import asyncio
 import logging
 import os
