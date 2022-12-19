@@ -9,7 +9,7 @@ from cantools.database import Database as CanDatabase
 from cantools.database import Message as CanMessage
 from cantools.database import load_file as load_can_database
 
-from .obd_signal import ObdSignal
+from .obdsignal import ObdSignal
 
 DBC_FILE = os.getenv('DBC_FILE', './dbc/python-obd.dbc')
 DBC_MSG_NAME = os.getenv('DBC_MSG_NAME', 'OBD2_RESPONSE')
