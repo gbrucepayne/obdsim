@@ -1,6 +1,8 @@
 """BLE Adapter for OBDII Scanner.
 
-Work in progress...
+Run the scanner to create a BleUart class.
+Set the serial port name (symlink to /dev/pty/N) - default `/tmp/ttyBLE`.
+Start the BleUart.
 """
 import asyncio
 import atexit
@@ -8,7 +10,7 @@ import logging
 
 from ble_serial.bluetooth.ble_interface import BLE_interface
 from ble_serial.ports.linux_pty import UART
-from bleak import AdvertisementData, BleakClient, BleakScanner, BLEDevice, BleakError
+from bleak import BleakClient, BleakScanner, BLEDevice, BleakError
 
 from obdsim.bluetooth import ADAPTER_NAME
 
