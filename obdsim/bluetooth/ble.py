@@ -8,9 +8,9 @@ import asyncio
 import atexit
 import logging
 from asyncio import FIRST_COMPLETED
+from typing import Callable
 
-from ble_serial.bluetooth.ble_interface import BLE_interface
-from ble_serial.ports.linux_pty import UART
+from obdsim.bluetooth import UartPty, UartBle
 from bleak import BleakClient, BleakScanner, BLEDevice, BleakError
 
 from obdsim.bluetooth import ADAPTER_NAME
@@ -18,11 +18,8 @@ from obdsim.bluetooth import ADAPTER_NAME
 _log = logging.getLogger(__name__)
 
 
-class BleUart:
-    """A BLE UART class.
-    
-    TODO: simplify/improve underlying ble-serial?  e.g. 9600 baud only etc
-    
+class BleUartBridge:
+    """A Class that bridges a (remote) BLE UART with a (local) PTY UART.
     """
     def __init__(self,
                  device_addr: str,
@@ -33,6 +30,7 @@ class BleUart:
                  port: str = '/tmp/ttyBLE',
                  mtu: int = 20,
                  hci: str = 'hci0',
+                 disconnect_handler: Callable = None,
                  ) -> None:
         atexit.register(self._cleanup)
         self.addr = device_addr
@@ -43,9 +41,10 @@ class BleUart:
         self.port = port
         self.mtu = mtu
         self.hci = hci
-        self.uart: UART = None
-        self.ble: BLE_interface = None
+        self.uart: UartPty = None
+        self.ble: UartBle = None
         self._main_tasks: 'dict[asyncio.Task]' = {}
+        self._disconnect_handler: Callable = disconnect_handler
     
     def start(self):
         """Starts the UART process."""
@@ -55,15 +54,18 @@ class BleUart:
         try:
             loop = asyncio.get_event_loop()
             loop.set_exception_handler(self._exc_handler)
-            self.uart = UART(self.port, loop, self.mtu)
-            self.ble = BLE_interface(self.hci, None)
-            self.uart.set_receiver(self.ble.queue_send)
+            self.uart = UartPty(self.port, loop=loop, mtu=self.mtu)
+            self.ble = UartBle(self.hci, None)
+            self.uart.set_receiver(self.ble.queue_write)
             self.ble.set_receiver(self.uart.queue_write)
+            _log.info(f'Linked {self.port} with {self.addr}')
             self.uart.start()
-            await self.ble.connect(self.addr, 'public', self.timeout)
-            await self.ble.setup_chars(self.tx_uuid, self.rx_uuid, 'rw')
+            await self.ble.connect(self.addr,
+                                   timeout=self.timeout,
+                                   disconnect_handler=self._disconnect_handler)
+            await self.ble.setup_chars(self.tx_uuid, self.rx_uuid)
             self._main_tasks = {
-                asyncio.create_task(self.ble.send_loop()),
+                asyncio.create_task(self.ble.run_loop()),
                 asyncio.create_task(self.uart.run_loop()),
             }
             done, pending = await asyncio.wait(self._main_tasks,
@@ -74,7 +76,7 @@ class BleUart:
         except BleakError as err:
             _log.error(f'BLE connection failed: {err}')
         except Exception as err:
-            _log.error(f'Unexpected error: {repr(err)}')
+            _log.exception(f'Unexpected error: {repr(err)}')
         finally:
             self._cleanup()
     
@@ -86,7 +88,6 @@ class BleUart:
             self.uart.remove()
         if self.ble:
             self.ble.stop_loop()
-            self.ble.disconnect()
             
     def _exc_handler(self, loop: asyncio.AbstractEventLoop, context):
         _log.debug(f'asyncio exception: {context["exception"]}')
@@ -109,10 +110,10 @@ async def scan_ble(target: str = ADAPTER_NAME, scan_time: int = 5) -> dict:
     service_uuid = ''
     rx_uuid = ''
     tx_uuid = ''
-    _log.debug('Scanning for BLE devices')
+    _log.info('Scanning for BLE devices...')
     devices: dict = await BleakScanner().discover(timeout=scan_time,
                                                   return_adv=True)
-    _log.info(f'Found {len(devices)} devices')
+    _log.debug(f'Found {len(devices)} devices')
     n = 0
     for d, _a in devices.values():
         assert isinstance(d, BLEDevice)
@@ -121,7 +122,7 @@ async def scan_ble(target: str = ADAPTER_NAME, scan_time: int = 5) -> dict:
         try:
             if target not in d.name:
                 continue
-            _log.info(f'Device {n} of {len(devices)}: {d.name} ({d.address})')
+            _log.info(f'Assessing: {d.name} ({d.address})')
             obd_addr = d.address
             async with BleakClient(d) as client:
                 if client.services is not None:
@@ -147,17 +148,25 @@ async def scan_ble(target: str = ADAPTER_NAME, scan_time: int = 5) -> dict:
                 'tx_uuid': tx_uuid,
                 'rx_uuid': rx_uuid,
             }
+        except BleakError as err:
+            _log.error(err)
+            _log.info('Try power cycling OBD reader')
         except Exception as err:
             _log.error(err)
 
 
 if __name__ == '__main__':
+    format_csv = ('%(asctime)s.%(msecs)03dZ,[%(levelname)s],(%(threadName)s)'
+                '%(module)s.%(funcName)s:%(lineno)d, %(message)s')
+    logging.basicConfig(format=format_csv)
+    _log.setLevel(logging.INFO)
     try:
         ble_parameters = asyncio.run(scan_ble('Vlink'))
         if not ble_parameters:
-            print('No OBD BLE found')
+            print('No OBD BLE found or could not connect')
         else:
-            ble_uart = BleUart(**ble_parameters)
+            print(f'Found OBD BLE device {ble_parameters["device_addr"]}')
+            ble_uart = BleUartBridge(**ble_parameters)
             ble_uart.start()
     except Exception as err:
         _log.error(err)
