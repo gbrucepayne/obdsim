@@ -9,7 +9,8 @@ from cantools.database import Database as CanDatabase
 from cantools.database import Message as CanMessage
 from cantools.database import load_file as load_can_database
 
-from .obdsignal import ObdSignal
+from . import ObdSignal
+from .vcan import create_vcan
 
 DBC_FILE = os.getenv('DBC_FILE', './dbc/python-obd.dbc')
 DBC_MSG_NAME = os.getenv('DBC_MSG_NAME', 'OBD2_RESPONSE')
@@ -36,13 +37,10 @@ class ObdSimulator:
     def start(self):
         self._listener.start()
         
-    def connect(self, bus_name: str = 'vcan0'):
+    def connect(self, bus_name: str):
+        if not bus_name:
+            raise ValueError('Missing bus_name')
         sys_name = f'/sys/class/net/{bus_name}'
-        if not os.path.exists(sys_name):
-            _log.debug(f'Attempting to create virtual {bus_name}')
-            script_dir = f'{os.getcwd()}/vcan.sh'
-            with Popen(['bash', script_dir], stdout=PIPE) as proc:
-                _log.debug(proc.stdout.read())
         if not os.path.exists(sys_name):
             raise FileNotFoundError(f'Cannot find {sys_name}')
         _log.debug(f'Using CANbus {bus_name}')

@@ -2,10 +2,8 @@
 import logging
 
 import obd
-from obd import OBD
 
-from obdsim.obdscanner import ObdScanner
-from obdsim.obdsignal import ObdSignal
+from .. import ObdScanner, ObdSignal
 
 _log = logging.getLogger(__name__)
 
@@ -17,7 +15,7 @@ class ElmScanner(ObdScanner):
     def connect(self, port: str = None):
         protocol = obd.protocols.ISO_15765_4_11bit_500k.ELM_ID
         _log.info(f'Searching for ELM327 adapters...')
-        self.connection = OBD(portstr=port, protocol=protocol)
+        self.connection = obd.OBD(portstr=port, protocol=protocol)
         if not self.connection.is_connected():
             raise ConnectionError('Could not connect with ELM327 adapter')
     
