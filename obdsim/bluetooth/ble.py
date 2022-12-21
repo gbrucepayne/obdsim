@@ -7,6 +7,7 @@ Start the BleUart.
 import asyncio
 import atexit
 import logging
+from asyncio import FIRST_COMPLETED
 
 from ble_serial.bluetooth.ble_interface import BLE_interface
 from ble_serial.ports.linux_pty import UART
@@ -44,9 +45,10 @@ class BleUart:
         self.hci = hci
         self.uart: UART = None
         self.ble: BLE_interface = None
+        self._main_tasks: 'dict[asyncio.Task]' = {}
     
     def start(self):
-        """"""
+        """Starts the UART process."""
         asyncio.run(self._run())
     
     async def _run(self):
@@ -60,13 +62,14 @@ class BleUart:
             self.uart.start()
             await self.ble.connect(self.addr, 'public', self.timeout)
             await self.ble.setup_chars(self.tx_uuid, self.rx_uuid, 'rw')
-            main_tasks = {
+            self._main_tasks = {
                 asyncio.create_task(self.ble.send_loop()),
                 asyncio.create_task(self.uart.run_loop()),
             }
-            done, pending = await asyncio.wait(main_tasks,
-                                               return_when=asyncio.FIRST_COMPLETED)
-            _log.debug(f'Completed tasks: {[(t._coro, t.result()) for t in done]}')
+            done, pending = await asyncio.wait(self._main_tasks,
+                                               return_when=FIRST_COMPLETED)
+            _log.debug('Completed tasks:'
+                       f' {[(t._coro, t.result()) for t in done]}')
             _log.debug(f'Pending tasks: {[t._coro for t in pending]}')
         except BleakError as err:
             _log.error(f'BLE connection failed: {err}')
@@ -76,6 +79,8 @@ class BleUart:
             self._cleanup()
     
     def _cleanup(self):
+        for task in self._main_tasks:
+            task.cancel()
         if self.uart:
             self.uart.stop_loop()
             self.uart.remove()
@@ -84,23 +89,24 @@ class BleUart:
             self.ble.disconnect()
             
     def _exc_handler(self, loop: asyncio.AbstractEventLoop, context):
-        _log.debug(f'asyncio exception handler calle {context["exception"]}')
+        _log.debug(f'asyncio exception: {context["exception"]}')
         self._cleanup()
     
     
-async def scan_ble(target: str = ADAPTER_NAME, scan_time: int = 5) -> BleUart:
+async def scan_ble(target: str = ADAPTER_NAME, scan_time: int = 5) -> dict:
     """Attempts to connect to a BLE OBD2 scanner and get its GATT services.
     
     Args:
-        target: The name of the adapter when scanning bluetooth e.g. `OBDII`
-            or `Vlink`
+        target: The name of the adapter when scanning bluetooth
+            e.g. `OBDII` or `Vlink`
     
     Returns:
-        A tuple with the adapter's MAC address, service UUID, write UUID,
-            read UUID
+        A dictionary with BLE parameters `device_addr`, `service_uuid`,
+            `tx_uuid` and `rx_uuid`.
+            
     """
     obd_addr = ''
-    uart_uuid = ''
+    service_uuid = ''
     rx_uuid = ''
     tx_uuid = ''
     _log.debug('Scanning for BLE devices')
@@ -130,22 +136,28 @@ async def scan_ble(target: str = ADAPTER_NAME, scan_time: int = 5) -> BleUart:
                                 _log.debug('WRITE:', c, c.properties)
                                 tx_uuid = c.uuid
                             if rx_uuid and tx_uuid:
-                                uart_uuid = c.service_uuid
-                        if uart_uuid:
+                                service_uuid = c.service_uuid
+                        if service_uuid:
                             break
-            if not all([obd_addr, uart_uuid, tx_uuid, rx_uuid]):
+            if not all([obd_addr, service_uuid, tx_uuid, rx_uuid]):
                 raise OSError(f'Could not find OBD BLE device {ADAPTER_NAME}')
-            return BleUart(obd_addr, uart_uuid, tx_uuid, rx_uuid)
+            return {
+                'device_addr': obd_addr,
+                'service_uuid': service_uuid,
+                'tx_uuid': tx_uuid,
+                'rx_uuid': rx_uuid,
+            }
         except Exception as err:
             _log.error(err)
 
 
 if __name__ == '__main__':
     try:
-        ble_uart = asyncio.run(scan_ble('Vlink'))
-        if ble_uart is None:
+        ble_parameters = asyncio.run(scan_ble('Vlink'))
+        if not ble_parameters:
             print('No OBD BLE found')
         else:
+            ble_uart = BleUart(**ble_parameters)
             ble_uart.start()
     except Exception as err:
         _log.error(err)
