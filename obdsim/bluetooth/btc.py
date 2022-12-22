@@ -18,6 +18,7 @@ class BtcUartBridge:
     """
     def __init__(self,
                  device_addr: str,
+                 device_name: str = None,
                  channel: int = 1,
                  timeout: float = 10,
                  port: str = '/tmp/ttyBTC',
@@ -26,6 +27,7 @@ class BtcUartBridge:
                  ) -> None:
         atexit.register(self._cleanup)
         self.addr = device_addr
+        self.name = device_name or device_addr
         self.channel = channel
         self.timeout = timeout
         self.port = port
@@ -82,7 +84,8 @@ class BtcUartBridge:
         self._cleanup()
 
 
-def scan_btc(target: str = ADAPTER_NAME, duration: int = 10) -> dict:
+def scan_btc(target: 'str|list[str]' = ADAPTER_NAME,
+             duration: int = 10) -> dict:
     """Scans for 'Classic' Bluetooth serial devices based on a target name.
     
     Args:
@@ -94,21 +97,26 @@ def scan_btc(target: str = ADAPTER_NAME, duration: int = 10) -> dict:
         A dictionary with connection parameters `device_addr`, `channel`.
         
     """
-    device_addr = ''
-    channel = 1
+    if not isinstance(target, (str, list)):
+        raise ValueError('Invalid target must be string or list of strings.')
+    if isinstance(target, str):
+        target = [target]
+    btc_parameters = {}
+    required = ('device_addr', 'channel')
     sp_service = False
     _log.info('Scanning for bluetooth devices...')
     devices = bluetooth.discover_devices(duration=duration,
                                          lookup_names=True,
                                          lookup_class=True,
                                          flush_cache=True)
-    _log.debug(f'Found {len(devices)} devices')
+    _log.info(f'Found {len(devices)} devices')
     for addr, name, _class in devices:
-        if target not in name:
+        if not any(t in name for t in target):
             # _log.debug(f'Skipping {name}')
             continue
         _log.info(f'Assessing device {name} ({addr})')
-        device_addr = addr
+        btc_parameters['device_name'] = name
+        btc_parameters['device_addr'] = addr
         services = bluetooth.find_service(address=addr)
         if not services:
             _log.info(f'Using SDP to find Serial Port service...')
@@ -116,23 +124,22 @@ def scan_btc(target: str = ADAPTER_NAME, duration: int = 10) -> dict:
             res = subprocess.run(cmd.split(' '), stdout=subprocess.PIPE)
             cmd_response = [r.strip() for r in res.stdout.decode().split('\n')]
             for line in cmd_response:
-                if 'Serial Port' in line or 'RFCOMM' in line:
+                if any(s in line for s in ('Serial Port', 'RFCOMM')):
                     sp_service = True
                 if line.startswith('Channel:'):
-                    channel = int(line.split(':')[1])
-                if channel and sp_service:
-                    break
+                    btc_parameters['channel'] = int(line.split(':')[1])
+                if sp_service and 'channel' in btc_parameters:
+                    break   # found; iteration complete
         else:
             _log.warning('UNTESTED bluetooth [services]')
             for service in services:
                 if 'port' in service:
-                    channel = int(service['port'])
+                    btc_parameters['channel'] = int(service['port'])
         if not sp_service:
             _log.warning('Unable to verify Serial Port service or UUID')
-        return {
-            'device_addr': device_addr,
-            'channel': channel,
-        }
+        if not all(p in btc_parameters for p in required):
+            btc_parameters = {}
+        return btc_parameters
     
 
 if __name__ == '__main__':
@@ -141,11 +148,11 @@ if __name__ == '__main__':
     logging.basicConfig(format=format_csv)
     _log.setLevel(logging.INFO)
     try:
-        btc_name = 'Android-Vlink'
+        btc_name = ['Vlink', 'OBDII']
         bt_parameters = scan_btc(btc_name)
         if not bt_parameters:
             raise OSError(f'No Bluetooth device {btc_name} found')
-        print(f'Found {btc_name} ({bt_parameters})')
+        print(f'Found OBD BT Device:({bt_parameters})')
         btc_uart = BtcUartBridge(**bt_parameters)
         btc_uart.start()
     except Exception as err:
