@@ -94,7 +94,8 @@ class BleUartBridge:
         self._cleanup()
     
     
-async def scan_ble(target: str = ADAPTER_NAME, scan_time: int = 5) -> dict:
+async def scan_ble(target: 'str|list[str]' = ADAPTER_NAME,
+                   scan_time: int = 5) -> dict:
     """Attempts to connect to a BLE OBD2 scanner and get its GATT services.
     
     Args:
@@ -106,24 +107,26 @@ async def scan_ble(target: str = ADAPTER_NAME, scan_time: int = 5) -> dict:
             `tx_uuid` and `rx_uuid`.
             
     """
-    obd_addr = ''
-    service_uuid = ''
-    rx_uuid = ''
-    tx_uuid = ''
+    if not isinstance(target, (str, list)):
+        raise ValueError('Invalid target must be string or list of strings')
+    if isinstance(target, str):
+        target = [target]
+    ble_parameters = {}
+    required = ('device_addr', 'service_uuid', 'tx_uuid', 'rx_uuid')
     _log.info('Scanning for BLE devices...')
     devices: dict = await BleakScanner().discover(timeout=scan_time,
                                                   return_adv=True)
-    _log.debug(f'Found {len(devices)} devices')
-    n = 0
+    _log.info(f'Found {len(devices)} candidate devices')
+    i = 0
     for d, _a in devices.values():
+        i += 1
         assert isinstance(d, BLEDevice)
-        # assert isinstance(_a, AdvertisementData)
-        n += 1
+        if not any(t in d.name for t in target):
+            # _log.debug(f'Skipping {d.name} ({i} of {len(devices)}')
+            continue
         try:
-            if target not in d.name:
-                continue
             _log.info(f'Assessing: {d.name} ({d.address})')
-            obd_addr = d.address
+            ble_parameters['device_addr'] = d.address
             async with BleakClient(d) as client:
                 if client.services is not None:
                     for service in client.services:
@@ -132,27 +135,29 @@ async def scan_ble(target: str = ADAPTER_NAME, scan_time: int = 5) -> dict:
                         for c in service.characteristics:
                             if 'notify' in c.properties:
                                 _log.debug('READ:', c, c.properties)
-                                rx_uuid = c.uuid
+                                ble_parameters['rx_uuid'] = c.uuid
                             elif 'write-without-response' in c.properties:
                                 _log.debug('WRITE:', c, c.properties)
-                                tx_uuid = c.uuid
-                            if rx_uuid and tx_uuid:
-                                service_uuid = c.service_uuid
-                        if service_uuid:
-                            break
-            if not all([obd_addr, service_uuid, tx_uuid, rx_uuid]):
-                raise OSError(f'Could not find OBD BLE device {ADAPTER_NAME}')
-            return {
-                'device_addr': obd_addr,
-                'service_uuid': service_uuid,
-                'tx_uuid': tx_uuid,
-                'rx_uuid': rx_uuid,
-            }
+                                ble_parameters['tx_uuid'] = c.uuid
+                            if all(p in ble_parameters for p in
+                                   ('rx_uuid', 'tx_uuid')):
+                                ble_parameters['service_uuid'] = c.service_uuid
+                        if 'service_uuid' in ble_parameters:
+                            break   # found UART; services iteration complete
+            if all(p in ble_parameters for p in required):
+                break   # found target; devices iteration complete
+            else:
+                ble_parameters = {}
         except BleakError as err:
             _log.error(err)
             _log.info('Try power cycling OBD reader')
         except Exception as err:
             _log.error(err)
+        finally:
+            if not all(p in ble_parameters for p in required):
+                _log.warning(f'Unable to find UART criteria in BLE devices')
+                ble_parameters = {}
+            return ble_parameters
 
 
 if __name__ == '__main__':
