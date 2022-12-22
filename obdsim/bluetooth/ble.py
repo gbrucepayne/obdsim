@@ -26,6 +26,7 @@ class BleUartBridge:
                  service_uuid: str,
                  tx_uuid: str,
                  rx_uuid: str,
+                 device_name: str = None,
                  timeout: float = 10,
                  port: str = '/tmp/ttyBLE',
                  mtu: int = 20,
@@ -34,6 +35,7 @@ class BleUartBridge:
                  ) -> None:
         atexit.register(self._cleanup)
         self.addr = device_addr
+        self.name = device_name or device_addr
         self.service_uuid = service_uuid
         self.tx_uuid = tx_uuid
         self.rx_uuid = rx_uuid
@@ -126,6 +128,7 @@ async def scan_ble(target: 'str|list[str]' = ADAPTER_NAME,
             continue
         try:
             _log.info(f'Assessing: {d.name} ({d.address})')
+            ble_parameters['device_name'] = d.name
             ble_parameters['device_addr'] = d.address
             async with BleakClient(d) as client:
                 if client.services is not None:
@@ -169,7 +172,7 @@ if __name__ == '__main__':
         ble_parameters = asyncio.run(scan_ble('Vlink'))
         if not ble_parameters:
             raise OSError('No OBD BLE found or could not connect')
-        print(f'Found OBD BLE device {ble_parameters["device_addr"]}')
+        print(f'Found OBD BLE device: {ble_parameters}')
         ble_uart = BleUartBridge(**ble_parameters)
         ble_uart.start()
     except Exception as err:
