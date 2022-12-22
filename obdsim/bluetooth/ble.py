@@ -163,10 +163,9 @@ if __name__ == '__main__':
     try:
         ble_parameters = asyncio.run(scan_ble('Vlink'))
         if not ble_parameters:
-            print('No OBD BLE found or could not connect')
-        else:
-            print(f'Found OBD BLE device {ble_parameters["device_addr"]}')
-            ble_uart = BleUartBridge(**ble_parameters)
-            ble_uart.start()
+            raise OSError('No OBD BLE found or could not connect')
+        print(f'Found OBD BLE device {ble_parameters["device_addr"]}')
+        ble_uart = BleUartBridge(**ble_parameters)
+        ble_uart.start()
     except Exception as err:
-        _log.error(err)
+        _log.exception(err)

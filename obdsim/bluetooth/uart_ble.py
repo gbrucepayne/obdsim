@@ -50,7 +50,8 @@ class UartBle():
         if self._read_enabled:
             # read_props = ['notify', 'indicate']
             # self._read_char = self.find_char(read_uuid, read_props)
-            await self._client.start_notify(self._read_uuid, self._handle_notify)
+            await self._client.start_notify(self._read_uuid,
+                                            self._handle_notify)
         else:
             _log.info('Reading disabled, skipping read UUID detection')
 
