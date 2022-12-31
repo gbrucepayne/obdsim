@@ -1,3 +1,4 @@
+"""A model for simulated OBD2 PID signals."""
 import time
 from enum import IntEnum
 
@@ -25,9 +26,20 @@ class ObdStatus:
 
 
 class ObdSignal:
+    """A class defining a simulated OBD2 signal.
+    
+    Attributes:
+        mode (int): The OBD2 mode / service.
+        pid (int): The OBD2 PID parameter number (service-dependent).
+        length (int): The number of bytes used by the PID.
+        value: A measurement value with units from the `pint` module.
+        value_raw: The raw measurement value without units.
+        ts (float): The (unix) timestamp of the measurement.
+        
+    """
     PID_DEFINITIONS = [
         # (mode, pid, name, unit/type, bytes)
-        (0x1, 0x0, 'PIDS_A', 'bitmask'),
+        (0x1, 0x0, 'PIDS_A', 'bitmask', 4),
         (0x1, 0x1, 'STATUS', ObdStatus),
         # (0x1, 0x2, 'FREEZE_DTC', 'FreezeDtc'),
         # (0x1, 0x3, 'FUEL_STATUS', tuple[str, str]),
@@ -38,10 +50,11 @@ class ObdSignal:
     ]
     
     def __init__(self, mode: int, pid: int, value, ts: float = None) -> None:
-        self.mode = mode
-        self.pid = pid
+        self.mode: int = mode
+        self.pid: int = pid
+        self._length: int = 0
         self._value = value
-        self.ts = ts or time.time()
+        self.ts: float = ts or time.time()
 
     @classmethod
     def get_pid_by_name(cls, name: str, mode: int = 1) -> 'int|None':
@@ -116,3 +129,12 @@ class ObdSignal:
         #     return str(self._value)
         else:
             return self._value
+    
+    @value.setter
+    def value(self, value):
+        raise NotImplementedError
+    
+    @property
+    def length(self) -> int:
+        # TODO: populate length for different parameters
+        return self._length

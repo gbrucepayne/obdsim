@@ -1,8 +1,7 @@
-"""OBD2 sender utility to generate requests for vehicle sensor data."""
+"""OBD2 scanner for native CANbus (ISO 15765-4)."""
 import logging
 import os
 import time
-from subprocess import PIPE, Popen
 
 import can
 
@@ -12,7 +11,13 @@ _log = logging.getLogger(__name__)
 
 
 class CanScanner(ObdScanner):
-    """Scans on a native or virtual CANbus using OBDII."""
+    """Scans periodically on a native or virtual CANbus using ISO 15765-4.
+    
+    Subclass of ObdScanner.
+    """
+    
+    __doc__ = f'{ObdScanner.__doc__}\n{__doc__}'
+    
     def __init__(self, canbus: can.Bus = None, **kwargs) -> None:
         """Create a CAN scanner.
         
@@ -31,6 +36,7 @@ class CanScanner(ObdScanner):
         self.bus: can.Bus = canbus
 
     def connect(self, bus_name):
+        """Connects to the OBD2 CANbus."""
         if not bus_name:
             raise ValueError('Missing bus_name')
         sys_name = f'/sys/class/net/{bus_name}'
@@ -40,7 +46,7 @@ class CanScanner(ObdScanner):
         self.bus = can.Bus(bus_name, bustype='socketcan')
     
     def query(self, pid: int, mode: int = 1) -> 'ObdSignal|None':
-        """Returns the result of an OBD2 query."""
+        """Returns the result of an OBD2 query via CANbus."""
         pid_mode_str = f'PID_MODE_{mode:02d}'
         content = {
             'request': 0,

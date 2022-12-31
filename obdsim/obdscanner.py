@@ -1,4 +1,6 @@
-"""OBD2 sender utility to generate requests for vehicle sensor data."""
+"""OBD2 sender base class to generate requests for vehicle sensor data.
+
+"""
 import logging
 import os
 import time
@@ -23,6 +25,10 @@ class ObdScanner:
         scan_timeout (float): The timeout waiting for a response. Default `0.1`
         dbc_filename (str): The filename/path of the `.dbc` reference
         dbc_msgename (str): The BO_ name of the request name in the `.dbc` file.
+        pids_supported (dict): The PIDs supported by the vehicle, described
+            as { mode: [pid, ...]} where mode and pid are integers.
+        signals (dict): The decoded values of the PIDs most recently queried.
+            Described by { mode: { pid: ObdSignal }}
         
     """
     def __init__(self,
@@ -31,6 +37,18 @@ class ObdScanner:
                  dbc_filename: str = DBC_FILE,
                  dbc_msgname: str = DBC_MSG_NAME,
                  ) -> None:
+        """Instantiates the class.
+        
+        Args:
+            scan_interval: The refresh interval in seconds for supported PIDs.
+            scan_timeout: The time in seconds to wait for a response.
+            dbc_filename: The file path/name of the DBC to be used.
+                Can be set using environment variable `DBC_FILE`.
+                Defaults to `./dbc/python-obd.dbc`
+            dbc_msgname: The name of the request message set in the `BO_`
+                definition within the DBC file.
+        
+        """
         self.scan_interval = scan_interval
         self.scan_timeout = scan_timeout
         self._db: CanDatabase = load_can_database(dbc_filename)
@@ -42,14 +60,19 @@ class ObdScanner:
     
     @property
     def pids_supported(self) -> 'dict[list[int]]':
+        """PIDS supported by the vehicle."""
         return self._pids_supported
     
     @property
-    def signals(self) -> dict:
+    def signals(self) -> 'dict[dict[ObdSignal]]':
+        """Decoded signal values read from the vehicle."""
         return self._signals
     
     def connect(self):
-        """Overwrite with specific method in subclass."""
+        """Connects to the vehicle OBD2 bus.
+        
+        Overwrite with specific method in subclass.
+        """
         raise NotImplementedError('Subclass must provide connect method.')
     
     def start(self):
@@ -66,7 +89,10 @@ class ObdScanner:
         self._running = False
     
     def query(self, pid: int, mode: int = 1) -> ObdSignal:
-        """Overwrite with specific method in subclass."""
+        """Queries a specific PID with optional mode.
+        
+        Overwrite with specific method in subclass.
+        """
         raise NotImplementedError('Subclass must provide query method.')
     
     def _get_pids_supported(self):
@@ -90,7 +116,10 @@ class ObdScanner:
                     pids_supported.sort()
         
     def _loop(self):
-        """Loops through supported pids querying and populating signals."""
+        """Loops through supported pids querying and populating signals.
+        
+        Repeats at the scan_interval.
+        """
         if self._running:
             for mode, pids_supported in self.pids_supported.items():
                 for pid in pids_supported:

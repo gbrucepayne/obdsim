@@ -1,4 +1,8 @@
-"""OBD2 sender utility to generate requests for vehicle sensor data."""
+"""OBD2 sender utility to generate requests for vehicle sensor data.
+
+OBSOLETE - deprecate. replaced by obdscanner module with subclasses.
+
+"""
 import logging
 import os
 import time

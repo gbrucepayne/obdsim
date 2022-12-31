@@ -13,6 +13,7 @@ class UartBle():
         self.scan_args = dict(adapter=hci)
         if service_uuid:
             self.scan_args['service_uuids'] = [service_uuid]
+        self._addr: str = None
         self._client: BleakClient = None
         self._receiver: Callable = None
         self._read_enabled: bool = True
@@ -31,6 +32,7 @@ class UartBle():
                                    address_type=addr_type,
                                    timeout=timeout,
                                    disconnected_callback=self._handle_disconnect)
+        self._addr = addr
         self._disconnect_handler = disconnect_handler
         _log.info(f'Trying to connect with {addr}')
         await self._client.connect()
@@ -98,3 +100,5 @@ class UartBle():
         self.stop_loop()
         if callable(self._disconnect_handler):
             self._disconnect_handler(client.address)
+        else:
+            raise ConnectionResetError(f'BLE disconnected')

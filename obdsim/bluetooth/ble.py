@@ -1,19 +1,23 @@
 """BLE Adapter for OBDII Scanner.
 
-Run the scanner to create a BleUart class.
-Set the serial port name (symlink to /dev/pty/N) - default `/tmp/ttyBLE`.
-Start the BleUart.
+Usage:
+
+* Run the scanner to detect the OBD2 adapter and get kwarg parameters.
+* Create a BleUartBridge using the parameters.
+* Set the serial port name (symlink to /dev/pty/N) - default `/tmp/ttyBLE`.
+* Start the BleUartBridge.
+
 """
 import asyncio
 import atexit
 import logging
+import threading
 from asyncio import FIRST_COMPLETED
 from typing import Callable
 
-from obdsim.bluetooth import UartPty, UartBle
-from bleak import BleakClient, BleakScanner, BLEDevice, BleakError
+from bleak import BleakClient, BleakError, BleakScanner, BLEDevice
 
-from obdsim.bluetooth import ADAPTER_NAME
+from obdsim.bluetooth import ADAPTER_NAME, UartBle, UartPty
 
 _log = logging.getLogger(__name__)
 
@@ -47,16 +51,24 @@ class BleUartBridge:
         self.ble: UartBle = None
         self._main_tasks: 'dict[asyncio.Task]' = {}
         self._disconnect_handler: Callable = disconnect_handler
+        self._thread: threading.Thread = None
+        self._loop: asyncio.AbstractEventLoop = None
     
     def start(self):
         """Starts the UART process."""
-        asyncio.run(self._run())
+        self._thread = threading.Thread(target=self._daemon_start,
+                                        name='BleUartBridgeThread',
+                                        daemon=True)
+        self._thread.start()
     
+    def _daemon_start(self):
+        asyncio.run(self._run())
+        
     async def _run(self):
         try:
-            loop = asyncio.get_event_loop()
-            loop.set_exception_handler(self._exc_handler)
-            self.uart = UartPty(self.port, loop=loop, mtu=self.mtu)
+            self._loop = asyncio.get_event_loop()
+            self._loop.set_exception_handler(self._exc_handler)
+            self.uart = UartPty(self.port, loop=self._loop, mtu=self.mtu)
             self.ble = UartBle(self.hci, None)
             self.uart.set_receiver(self.ble.queue_write)
             self.ble.set_receiver(self.uart.queue_write)
@@ -75,10 +87,12 @@ class BleUartBridge:
             _log.debug('Completed tasks:'
                        f' {[(t._coro, t.result()) for t in done]}')
             _log.debug(f'Pending tasks: {[t._coro for t in pending]}')
-        except BleakError as err:
+        except (BleakError, ConnectionResetError) as err:
             _log.error(f'BLE connection failed: {err}')
+            raise err
         except Exception as err:
             _log.exception(f'Unexpected error: {repr(err)}')
+            raise err
         finally:
             self._cleanup()
     
@@ -118,7 +132,7 @@ async def scan_ble(target: 'str|list[str]' = ADAPTER_NAME,
     _log.info('Scanning for BLE devices...')
     devices: dict = await BleakScanner().discover(timeout=scan_time,
                                                   return_adv=True)
-    _log.info(f'Found {len(devices)} candidate devices')
+    _log.debug(f'Found {len(devices)} candidate devices')
     i = 0
     for d, _a in devices.values():
         i += 1
@@ -164,10 +178,11 @@ async def scan_ble(target: 'str|list[str]' = ADAPTER_NAME,
 
 
 if __name__ == '__main__':
+    import time
+    DURATION = 60
     format_csv = ('%(asctime)s.%(msecs)03dZ,[%(levelname)s],(%(threadName)s)'
                 '%(module)s.%(funcName)s:%(lineno)d, %(message)s')
-    logging.basicConfig(format=format_csv)
-    _log.setLevel(logging.INFO)
+    logging.basicConfig(format=format_csv, level=logging.INFO)
     try:
         ble_parameters = asyncio.run(scan_ble('Vlink'))
         if not ble_parameters:
@@ -175,5 +190,10 @@ if __name__ == '__main__':
         print(f'Found OBD BLE device: {ble_parameters}')
         ble_uart = BleUartBridge(**ble_parameters)
         ble_uart.start()
+        start_time = time.time()
+        while time.time() - start_time < DURATION:
+            elapsed = int(time.time() - start_time)
+            if elapsed % 10 == 0:
+                _log.info(f'Remaining: {int(DURATION - elapsed)} seconds...')
     except Exception as err:
         _log.exception(err)

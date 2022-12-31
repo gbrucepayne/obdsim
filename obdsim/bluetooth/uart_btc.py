@@ -9,13 +9,13 @@ import socket
 from asyncio import AbstractEventLoop, StreamReader, StreamWriter
 from typing import Callable
 
+from bluetooth import BluetoothError
+
 _log = logging.getLogger(__name__)
 
 
 class UartBtc():
-    def __init__(self,
-                 loop: AbstractEventLoop = None,
-                 ):
+    def __init__(self, loop: AbstractEventLoop = None):
         self.loop: AbstractEventLoop = loop or asyncio.get_running_loop()
         self._stall_loop = asyncio.Event()
         self._send_queue = asyncio.Queue()
@@ -31,22 +31,62 @@ class UartBtc():
         self._reading: bool = False
         self._writer: StreamWriter = None
         self._disconnect_handler: Callable = None
+        self._version: str = ''
 
     def connect(self,
                 addr: str,
                 port: int = 1,
-                timeout: float = 10,
+                timeout: float = 6,
                 disconnect_handler: Callable = None,
                 ):
         """Connects to the specified Bluetooth Classic device."""
-        self._client.setblocking(False)
-        # self._client.settimeout(timeout)
-        self._client.connect_ex((addr, port))
-        self._addr = addr
-        _log.info(f'Connected to {addr}')
-        self._disconnect_handler = disconnect_handler
-        self._stall_loop.set()
+        try:
+            self._client.setblocking(False)
+            res = self._client.connect_ex((addr, port))
+            if res != 115:
+                raise BluetoothError(f'Result code {res}')
+            # self._client.settimeout(timeout)
+            # self._client.connect((addr, port))
+            self._addr = addr
+            _log.info(f'Connected to {addr}')
+            self._disconnect_handler = disconnect_handler
+            self._stall_loop.set()
+        except (BluetoothError, OSError) as err:
+            if err.errno == 115:
+                return
+            elif '52' in str(err):
+                _log.warning('Suspected PIN problem')
+            _log.exception(err)
+            raise err
 
+    async def initialize(self, delay: float = 1):
+        _log.debug('Initializing ELM adapter...')
+        try:
+            await self.loop.sock_sendall(self._client, 'ATZ\r'.encode())
+            await asyncio.sleep(delay)
+            res = await asyncio.wait_for(
+                self.loop.sock_recv(self._client, self._recv_buffer), 5)
+            decoded = res.decode('utf-8', 'backslashreplace')
+            for line in decoded.split('\r'):
+                if line.startswith('ELM'):
+                    self._version = line
+            if self._version:
+                _log.info(f'Initialized {self._version}')
+            else:
+                _log.warning(f'Unable to parse ELM version from {decoded}')
+        except OSError as err:
+            if err.errno == 107:   # Transport endpoint not connected
+                _log.warning('Awaiting socket...')
+                await asyncio.sleep(1)
+                await self.initialize(delay)
+        except asyncio.TimeoutError:
+            _log.error('Failed to initialize ELM adapter')
+            raise
+        
+    @property
+    def initialized(self) -> bool:
+        return self._version != ''
+    
     async def run_recv_loop(self):
         """Starts the loop listening for data from the Bluetooth device."""
         assert callable(self._receiver), f'Receiver must be configured first'
@@ -57,9 +97,15 @@ class UartBtc():
                                                  self._recv_buffer)
                 self._receiver(data)
                 # await asyncio.sleep(0)
-            except ConnectionError as err:
-                _log.error(err)
-                self._handle_disconnect()
+            except (ConnectionError, OSError) as err:
+                if err.errno == 111:
+                    _log.warning('Connection refused')
+                elif err.errno == 52:
+                    _log.error('Suspected PIN problem')
+                else:
+                    _log.exception(err)
+                    self._handle_disconnect()
+                    raise err
 
     def stop_recv_loop(self):
         """Gracefully stops the reader loop."""
