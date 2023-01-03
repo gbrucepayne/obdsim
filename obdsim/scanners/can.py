@@ -5,7 +5,8 @@ import time
 
 import can
 
-from .. import ObdScanner, ObdSignal
+from obdsim.scanners import ObdScanner
+from obdsim import ObdSignal
 
 _log = logging.getLogger(__name__)
 
@@ -45,6 +46,10 @@ class CanScanner(ObdScanner):
         _log.debug(f'Using CANbus {bus_name}')
         self.bus = can.Bus(bus_name, bustype='socketcan')
     
+    @property
+    def is_connected(self) -> bool:
+        return isinstance(self.bus, can.Bus)
+    
     def query(self, pid: int, mode: int = 1) -> 'ObdSignal|None':
         """Returns the result of an OBD2 query via CANbus."""
         pid_mode_str = f'PID_MODE_{mode:02d}'
@@ -54,8 +59,8 @@ class CanScanner(ObdScanner):
             'length': 2,
             pid_mode_str: pid,
         }
-        data = self._obd_message.encode(content)
-        request = can.Message(arbitration_id=self._obd_message.frame_id,
+        data = self._obd_req.encode(content)
+        request = can.Message(arbitration_id=self._obd_req.frame_id,
                               data=data)
         response = None
         signal = None

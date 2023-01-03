@@ -520,7 +520,7 @@ python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "aad03155a4a85e9982ddcc3e904b67dfc0e31a389283272fa6c46d0228838b0d"
+content-hash = "242bfa4c788a099b5d28fcf310f2fa4113d75e2e3e2910e1ecb9aa79806155de"
 
 [metadata.files]
 argparse-addons = []

@@ -47,10 +47,10 @@ class BleUartBridge:
         self.port = port
         self.mtu = mtu
         self.hci = hci
-        self.uart: UartPty = None
-        self.ble: UartBle = None
+        self._pty: UartPty = None
+        self._ble: UartBle = None
         self._main_tasks: 'dict[asyncio.Task]' = {}
-        self._disconnect_handler: Callable = disconnect_handler
+        self._on_disconnect: Callable = disconnect_handler
         self._thread: threading.Thread = None
         self._loop: asyncio.AbstractEventLoop = None
     
@@ -68,19 +68,19 @@ class BleUartBridge:
         try:
             self._loop = asyncio.get_event_loop()
             self._loop.set_exception_handler(self._exc_handler)
-            self.uart = UartPty(self.port, loop=self._loop, mtu=self.mtu)
-            self.ble = UartBle(self.hci, None)
-            self.uart.set_receiver(self.ble.queue_write)
-            self.ble.set_receiver(self.uart.queue_write)
+            self._pty = UartPty(self.port, loop=self._loop, mtu=self.mtu)
+            self._ble = UartBle()
+            self._pty.set_receiver(self._ble.queue_write)
+            self._ble.set_receiver(self._pty.queue_write)
             _log.info(f'Linked {self.port} with {self.addr}')
-            self.uart.start()
-            await self.ble.connect(self.addr,
-                                   timeout=self.timeout,
-                                   disconnect_handler=self._disconnect_handler)
-            await self.ble.setup_chars(self.tx_uuid, self.rx_uuid)
+            self._pty.start()
+            await self._ble.connect(self.addr,
+                                    timeout=self.timeout,
+                                    disconnected_callback=self._on_disconnect)
+            await self._ble.setup_gatt(self.tx_uuid, self.rx_uuid)
             self._main_tasks = {
-                asyncio.create_task(self.ble.run_loop()),
-                asyncio.create_task(self.uart.run_loop()),
+                asyncio.create_task(self._ble.run_loop()),
+                asyncio.create_task(self._pty.run_loop()),
             }
             done, pending = await asyncio.wait(self._main_tasks,
                                                return_when=FIRST_COMPLETED)
@@ -89,21 +89,24 @@ class BleUartBridge:
             _log.debug(f'Pending tasks: {[t._coro for t in pending]}')
         except (BleakError, ConnectionResetError) as err:
             _log.error(f'BLE connection failed: {err}')
+            _log.warning('Some Bleak errors not propagating up...thread hangs?')
             raise err
         except Exception as err:
             _log.exception(f'Unexpected error: {repr(err)}')
             raise err
         finally:
             self._cleanup()
+            _log.warning('Attempt to avoid thread hang on Bleak error')
+            self._thread.join()
     
     def _cleanup(self):
         for task in self._main_tasks:
             task.cancel()
-        if self.uart:
-            self.uart.stop_loop()
-            self.uart.remove()
-        if self.ble:
-            self.ble.stop_loop()
+        if self._ble:
+            self._ble.stop_loop()
+        if self._pty:
+            self._pty.stop_loop()
+            self._pty.remove()
             
     def _exc_handler(self, loop: asyncio.AbstractEventLoop, context):
         _log.debug(f'asyncio exception: {context["exception"]}')
@@ -163,8 +166,6 @@ async def scan_ble(target: 'str|list[str]' = ADAPTER_NAME,
                             break   # found UART; services iteration complete
             if all(p in ble_parameters for p in required):
                 break   # found target; devices iteration complete
-            else:
-                ble_parameters = {}
         except BleakError as err:
             _log.error(err)
             _log.info('Try power cycling OBD reader')
@@ -191,9 +192,10 @@ if __name__ == '__main__':
         ble_uart = BleUartBridge(**ble_parameters)
         ble_uart.start()
         start_time = time.time()
-        while time.time() - start_time < DURATION:
+        while int(time.time() - start_time) < DURATION:
             elapsed = int(time.time() - start_time)
             if elapsed % 10 == 0:
                 _log.info(f'Remaining: {int(DURATION - elapsed)} seconds...')
+            time.sleep(1)
     except Exception as err:
         _log.exception(err)

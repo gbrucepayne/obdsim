@@ -94,7 +94,6 @@ class BtcUartBridge:
                              port=self.channel,
                              timeout=self.timeout,
                              disconnect_handler=self._disconnect_handler)
-            await self._btc.initialize()
             self._main_tasks = {
                 asyncio.create_task(self._btc.run_recv_loop()),
                 asyncio.create_task(self._btc.run_send_loop()),
@@ -191,7 +190,10 @@ def scan_btc(target: 'str|list[str]' = ADAPTER_NAME,
         return btc_parameters
     
 
-def pair_with_pin(addr: str, pin: 'int|str', debug: bool = False) -> bool:
+def pair_with_pin(addr: str,
+                  pin: 'int|str',
+                  timeout: int = 30,
+                  debug: bool = False) -> bool:
     """Launches a child process to supply the OBD2 PIN for pairing.
     
     Args:
@@ -211,9 +213,12 @@ def pair_with_pin(addr: str, pin: 'int|str', debug: bool = False) -> bool:
     try:
         paired: str = pexpect.run('bluetoothctl paired-devices').decode()
         if addr in paired:
+            _log.info(f'Found {addr} in paired-devices')
             return True
         _log.info('Spawning bluetoothctl for PIN pairing...')
-        analyzer = pexpect.spawn(command='bluetoothctl', encoding='utf-8')
+        analyzer = pexpect.spawn(command='bluetoothctl',
+                                 encoding='utf-8',
+                                 timeout=timeout)
         if debug:
             analyzer.logfile_read = sys.stdout
         analyzer.expect_exact('# ')
@@ -227,6 +232,13 @@ def pair_with_pin(addr: str, pin: 'int|str', debug: bool = False) -> bool:
     except Exception as err:
         _log.error(err)
         return False
+
+
+def forget_device(device_address: str):
+    """Removes the device from the host's list."""
+    res = pexpect.run(f'bluetoothctl remove {device_address}').decode()
+    if 'removed' not in res:
+        _log.warning(f'Device {device_address} may not have been removed')
 
 
 if __name__ == '__main__':

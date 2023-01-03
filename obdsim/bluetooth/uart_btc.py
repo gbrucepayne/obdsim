@@ -59,34 +59,6 @@ class UartBtc():
             _log.exception(err)
             raise err
 
-    async def initialize(self, delay: float = 1):
-        _log.debug('Initializing ELM adapter...')
-        try:
-            await self.loop.sock_sendall(self._client, 'ATZ\r'.encode())
-            await asyncio.sleep(delay)
-            res = await asyncio.wait_for(
-                self.loop.sock_recv(self._client, self._recv_buffer), 5)
-            decoded = res.decode('utf-8', 'backslashreplace')
-            for line in decoded.split('\r'):
-                if line.startswith('ELM'):
-                    self._version = line
-            if self._version:
-                _log.info(f'Initialized {self._version}')
-            else:
-                _log.warning(f'Unable to parse ELM version from {decoded}')
-        except OSError as err:
-            if err.errno == 107:   # Transport endpoint not connected
-                _log.warning('Awaiting socket...')
-                await asyncio.sleep(1)
-                await self.initialize(delay)
-        except asyncio.TimeoutError:
-            _log.error('Failed to initialize ELM adapter')
-            raise
-        
-    @property
-    def initialized(self) -> bool:
-        return self._version != ''
-    
     async def run_recv_loop(self):
         """Starts the loop listening for data from the Bluetooth device."""
         assert callable(self._receiver), f'Receiver must be configured first'

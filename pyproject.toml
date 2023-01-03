@@ -15,6 +15,7 @@ ble-serial = "^2.6.1"
 setuptools = "58"
 pybluez = {git = "https://github.com/pybluez/pybluez", rev = "0.23"}
 pexpect = "^4.8.0"
+pyserial = "^3.5"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.15.6"

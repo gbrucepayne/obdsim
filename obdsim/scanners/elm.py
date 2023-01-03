@@ -1,10 +1,10 @@
 """OBD2 sender utility to generate requests for vehicle sensor data."""
 import logging
+import time
 
-import obd
-from obd import OBDStatus
-
-from .. import ObdScanner, ObdSignal
+from obdsim.elm import Elm327, ElmStatus
+from obdsim.obdsignal import ObdSignal
+from obdsim.scanners import ObdScanner
 
 _log = logging.getLogger(__name__)
 
@@ -18,31 +18,60 @@ class ElmScanner(ObdScanner):
     __doc__ = f'{ObdScanner.__doc__}\n{__doc__}'
     
     def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self._adapter: obd.OBD = None
-        self._protocol = None   # obd.protocols.ISO_15765_4_11bit_500k.ELM_ID
+        """Instantiate a scanner.
         
-    def connect(self, port: str = None):
+        Args:
+            bluetooth (tuple): A tuple with (MAC, channel), if not using serial
+            serial_name (str): The serial port name, if not using bluetooth
+            
+        """
+        self._connection_kwargs = {}
+        if 'bluetooth' in kwargs:
+            if (not isinstance(kwargs['bluetooth'], tuple)):
+                raise ValueError('Invalid bluetooth parameters')
+            if 'serial_port' in kwargs:
+                raise ValueError('Use only one of bluetooth or serial_name')
+            self._connection_kwargs['bluetooth'] = kwargs.pop('bluetooth')
+        elif not 'serial_name' in kwargs:
+            raise ValueError('Missing serial_name or bluetooth parameters')
+        else:
+            self._connection_kwargs['serial_name'] = kwargs.pop('serial_name')
+        scanner_kwargs = {}
+        valid_scanner_kwargs = [
+            'scan_interval',
+            'scan_timeout',
+            'dbc_filename',
+            'dbc_msgname',
+        ]
+        for kwarg in kwargs:
+            if kwarg in valid_scanner_kwargs:
+                scanner_kwargs[kwarg] = kwargs.get(kwarg)
+            else:
+                self._connection_kwargs = kwargs.get(kwarg)
+        super().__init__(**scanner_kwargs)
+        self.elm = Elm327(**self._connection_kwargs)
+        
+    def connect(self, **kwargs):
         """Connects to the ELM327 adapter."""
-        _log.info(f'Searching for ELM327 adapters...')
-        self._adapter = obd.OBD(portstr=port, protocol=self._protocol)
-        _log.info(f'Adapter Status: {self._adapter.status()}')
-        if not self._adapter.status() in [OBDStatus.ELM_CONNECTED, OBDStatus.OBD_CONNECTED, OBDStatus.CAR_CONNECTED]:
-            raise ConnectionError('Could not connect with ELM327 adapter')
+        self.elm.connect()
+        self.elm.initialize()
+    
+    @property
+    def is_connected(self) -> bool:
+        return self.elm.status == ElmStatus.CAR_CONNECTED
     
     def query(self, pid: int, mode: int = 1) -> 'ObdSignal|None':
         """Queries the OBD2 vehicle bus for a specific PID and optional mode."""
-        if self._adapter.status() != OBDStatus.CAR_CONNECTED:
-            _log.warning('Vehicle not connected')
+        if not self.is_connected:
+            _log.warning('Vehicle not connected or ignition is off - skipping')
             return
-        cmd = obd.commands[mode][pid]
-        response = self._adapter.query(cmd)
-        signal = None
-        if response:
-            try:
-                assert isinstance(response, obd.OBDResponse)
-                _log.debug(f'ELM327 received: {response.message}')
-                signal = ObdSignal(mode, pid, response.value, response.time)
-            except Exception as err:
-                _log.error(err)
-        return signal
+        res: bytes = self.elm.query_pid(pid, mode)
+        if res:
+            res_mode = res[0]
+            res_pid = res[1]
+            res_data = res[2:]
+            decoded = self._db.decode_message(self._obd_res.frame_id, res)
+            # TODO: decode result
+            value = 999   #: placeholder
+            response_time = time.time()
+            return ObdSignal(mode, pid, value, response_time)
