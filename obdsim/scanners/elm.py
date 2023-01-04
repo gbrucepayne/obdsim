@@ -47,7 +47,7 @@ class ElmScanner(ObdScanner):
             if kwarg in valid_scanner_kwargs:
                 scanner_kwargs[kwarg] = kwargs.get(kwarg)
             else:
-                self._connection_kwargs = kwargs.get(kwarg)
+                self._connection_kwargs[kwarg] = kwargs.get(kwarg)
         super().__init__(**scanner_kwargs)
         self.elm = Elm327(**self._connection_kwargs)
         
