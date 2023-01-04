@@ -74,7 +74,7 @@ class Elm327:
             raise ValueError('Missing bluetooth or serial_name')
         self._elm_kwargs = {}
         elm_kwargs = ['protocol']
-        self._parse_kwargs(kwargs, self._connection_kwargs, elm_kwargs)
+        self._parse_kwargs(kwargs, self._elm_kwargs, elm_kwargs)
         atexit.register(self.disconnect)
         self._version = None
         self._low_power: bool = None
