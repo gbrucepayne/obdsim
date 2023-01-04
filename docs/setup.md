@@ -33,6 +33,11 @@ provides handy facilities for using standardized
 CAN protocols such as J1939). It also pulls in the
 [**`python-can`**](https://python-can.readthedocs.io/en/stable/) library.
 
+>:warning: `cantools.database.can.dbc.grammar` does not support `BS_`:
+```
+bs = Sequence('BS_', ':')
+```
+
 ## CSS-Electronics Tools
 
 [CSS Electronics](https://csselectronics.com) has been an invaluable resource.
