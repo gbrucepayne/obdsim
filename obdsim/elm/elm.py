@@ -66,14 +66,15 @@ class Elm327:
         elif 'serial_name' in kwargs:
             self._connection: serial.Serial = None
             self._connection_kwargs = { 'port': kwargs.pop('serial_name') }
-            valid_serial_kwargs = []
-            for kwarg in kwargs:
-                if kwarg in valid_serial_kwargs:
-                    self._connection_kwargs = kwargs.get(kwarg)
+            serial_kwargs = []
+            self._parse_kwargs(kwargs, self._connection_kwargs, serial_kwargs)
             if 'timeout' not in self._connection_kwargs:
                 self._connection_kwargs['timeout'] = 0
         else:
             raise ValueError('Missing bluetooth or serial_name')
+        self._elm_kwargs = {}
+        elm_kwargs = ['protocol']
+        self._parse_kwargs(kwargs, self._connection_kwargs, elm_kwargs)
         atexit.register(self.disconnect)
         self._version = None
         self._low_power: bool = None
@@ -81,6 +82,16 @@ class Elm327:
         self._timeout_count: int = 0
         self._max_timeouts = int(kwargs.get('max_timeouts', 3))
     
+    def _parse_kwargs(self,
+                      src_kwargs: dict,
+                      dst_kwargs: dict,
+                      filter: 'list[str]') -> None:
+        for kwarg in src_kwargs:
+            if kwarg in filter:
+                dst_kwargs[kwarg] = src_kwargs.get(kwarg)
+        for kwarg in dst_kwargs:
+            src_kwargs.pop(kwarg)
+        
     def connect(self):
         if isinstance(self._connection, Socket):
             try:
@@ -198,7 +209,10 @@ class Elm327:
         self._initialized = False
         self._timeout_count = 0
         
-    def initialize(self, attempts: int = 0, max_attempts: int = 3):
+    def initialize(self,
+                   attempts: int = 0,
+                   max_attempts: int = 3,
+                   protocol: ElmProtocol = None):
         _log.info('Initializing ELM device...')
         if attempts >= max_attempts:
             raise ConnectionError('No response from ELM')
@@ -212,12 +226,14 @@ class Elm327:
             if s.startswith('ELM'):
                 self._version = s
                 break
+        if not protocol:
+            protocol = self._elm_kwargs.get('protocol', ElmProtocol.AUTO)
         settings = {
             'echo_off': 'ATE0',
             'headers_off': 'ATH0',
             'linefeed_off': 'ATL0',
             'adaptive_timing': 'ATAT1',
-            'auto_protocol': 'ATSP0',
+            'auto_protocol': f'ATSP{protocol.value}',
         }
         for tag, command in settings.items():
             res = self.get_response(command)
@@ -294,7 +310,7 @@ class Elm327:
             raise ValueError(f'Unsupported Mode: {mode}')
         if pid not in range(0,256):
             raise ValueError(f'Invalid PID: {pid}')
-        res = self.get_response(f'{pid:0x02}{mode:0x02}')
+        res = self.get_response(f'{pid:02x}{mode:02x}')
         if 'SEARCHING...' in res:
             res.remove('SEARCHING...')
         if 'UNABLE TO CONNECT' in res:

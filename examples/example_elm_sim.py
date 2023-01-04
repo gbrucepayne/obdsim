@@ -10,6 +10,7 @@ from obdsim.bluetooth.ble import BleUartBridge, scan_ble
 from obdsim.bluetooth.btc import scan_btc, pair_with_pin
 from obdsim.scanners import ElmScanner
 from obdsim.simulator import ObdSimulator
+from obdsim.elm import ElmProtocol
 
 DEVICE_UNDER_TEST = os.getenv('DEVICE_UNDER_TEST')
 VEHICLE_BUS = os.getenv('VEHICLE_BUS')
@@ -40,6 +41,7 @@ def main():
         vehicle = ObdSimulator(VEHICLE_BUS)
         vehicle.connect()
         vehicle.start()
+        scanner_parameters['protocol'] = ElmProtocol.ISO_15765_4_11_500
     if isinstance(ble_parameters, dict) and not ble_parameters:
         ble_parameters = asyncio.run(scan_ble(device_names))
     if ble_parameters:
