@@ -39,6 +39,11 @@ if [ "$(id -u)" != 0 ]; then
   exit 1
 fi
 
+if [ -z "${ENABLE}" ]; then
+  echo "Missing -e argument"
+  exit 1
+fi
+
 if [ "${ENABLE}" == 1 ]; then
   modprobe can
   modprobe can_raw
