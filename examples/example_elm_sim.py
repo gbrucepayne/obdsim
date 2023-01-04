@@ -12,6 +12,7 @@ from obdsim.scanners import ElmScanner
 from obdsim.simulator import ObdSimulator
 
 DEVICE_UNDER_TEST = os.getenv('DEVICE_UNDER_TEST')
+VEHICLE_BUS = os.getenv('VEHICLE_BUS')
 
 format_csv = ('%(asctime)s.%(msecs)03dZ,[%(levelname)s],(%(threadName)s)'
               '%(module)s.%(funcName)s:%(lineno)d, %(message)s')
@@ -24,7 +25,6 @@ logger.addHandler(handler)
 
 
 def main():
-    simulate_vehicle = False
     ble_parameters = {}
     btc_parameters = {}
     scanner_parameters = {}
@@ -36,8 +36,8 @@ def main():
         elif 'btc' in config:
             ble_parameters = None
             btc_parameters = config['btc']
-    if simulate_vehicle:
-        vehicle = ObdSimulator('can0')
+    if VEHICLE_BUS:
+        vehicle = ObdSimulator(VEHICLE_BUS)
         vehicle.connect()
         vehicle.start()
     if isinstance(ble_parameters, dict) and not ble_parameters:
