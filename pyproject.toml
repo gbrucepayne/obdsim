@@ -7,7 +7,6 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-python-can = "^4.0.0"
 cantools = "^37.2.0"
 obd = "^0.7.1"
 pexpect = "^4.8.0"

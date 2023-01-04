@@ -30,12 +30,18 @@ I wanted to find a way to automate all that.
 The [**`cantools`**](https://cantools.readthedocs.io/en/latest/) library
 provides handy facilities for using standardized
 [DBC]() files to define the supported OBD2 messages (extensible to other
-CAN protocols such as J1939).
+CAN protocols such as J1939). It also pulls in the
+[**`python-can`**](https://python-can.readthedocs.io/en/stable/) library.
 
-## CSS-Electronics CAN Decoder
+## CSS-Electronics Tools
 
-The [CSS Electronics](https://csselectronics.com) team produced a
-package [**`can-decoder`**](https://github.com/CSS-Electronics/can_decoder) that
+[CSS Electronics](https://csselectronics.com) has been an invaluable resource.
+
+The samples and tools for developing DBC files were very helpful, in addition
+to the basic training on all things OBD/J1939.
+
+Their team also produced a package
+[**`can-decoder`**](https://github.com/CSS-Electronics/can_decoder) that
 seems highly useful for various types of analysis.
 
 >*Not currently used in this library.*
