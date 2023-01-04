@@ -310,7 +310,7 @@ class Elm327:
             raise ValueError(f'Unsupported Mode: {mode}')
         if pid not in range(0,256):
             raise ValueError(f'Invalid PID: {pid}')
-        res = self.get_response(f'{pid:02x}{mode:02x}')
+        res = self.get_response(f'{mode:02x}{pid:02x}')
         if 'SEARCHING...' in res:
             res.remove('SEARCHING...')
         if 'UNABLE TO CONNECT' in res:
