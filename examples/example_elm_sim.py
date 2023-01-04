@@ -37,8 +37,8 @@ def main():
             ble_parameters = None
             btc_parameters = config['btc']
     if simulate_vehicle:
-        vehicle = ObdSimulator()
-        vehicle.connect('vcan0')
+        vehicle = ObdSimulator('can0')
+        vehicle.connect()
         vehicle.start()
     if isinstance(ble_parameters, dict) and not ble_parameters:
         ble_parameters = asyncio.run(scan_ble(device_names))

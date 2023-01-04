@@ -27,6 +27,7 @@ class ObdSimulator:
         
     """
     def __init__(self,
+                 canbus_name: str = None,
                  dbc: str = DBC_FILE,
                  dbc_bo_name: str = DBC_MSG_NAME,
                  timeout: float = 0.1,
@@ -34,7 +35,9 @@ class ObdSimulator:
         """Instantiates the class.
         
         Args:
-            dbc: The `DBC` path/filename. Can use environment variable
+            canbus_name (str): The name of the CAN bus interface e.g. `can0`.
+                Optional, can be specified with connect method.
+            dbc (str): The `DBC` path/filename. Can use environment variable
                 `DBC_FILE`, defaults to `./dbc/python-obd.dbc`.
             dbc_bo_name: The name of the BO_ definition in the DBC file.
                 Supports environment variable `DBC_RESPONSE_BO_NAME`.
@@ -43,6 +46,7 @@ class ObdSimulator:
         """
         self._db: CanDatabase = load_can_database(dbc)
         self._obd_msg: CanMessage = self._db.get_message_by_name(dbc_bo_name)
+        self._bus_name: str = canbus_name
         self._bus: can.Bus = None
         self.timeout: float = timeout
         self._listener = threading.Thread(target=self._listen,
@@ -54,10 +58,15 @@ class ObdSimulator:
         """Starts listening for queries on the CANbus."""
         self._listener.start()
         
-    def connect(self, bus_name: str):
+    def connect(self, bus_name: str = None):
         """Connects to the CANbus."""
         if not bus_name:
-            raise ValueError('Missing bus_name')
+            if not self._bus_name:
+                raise ValueError('Missing bus_name')
+            else:
+                bus_name = self._bus_name
+        elif not self._bus_name:
+            self._bus_name = bus_name
         sys_name = f'/sys/class/net/{bus_name}'
         if not os.path.exists(sys_name):
             raise FileNotFoundError(f'Cannot find {sys_name}')
