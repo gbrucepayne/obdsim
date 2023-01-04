@@ -59,9 +59,7 @@ def main():
         paired = pair_with_pin(device_address, 1234, timeout=40)
         if not paired:
             raise ConnectionError('Unable to pair Bluetooth using PIN')
-        scanner_parameters = {
-            'bluetooth': (device_address, device_channel),
-        }
+        scanner_parameters ['bluetooth'] = (device_address, device_channel)
     try:
         scanner_parameters['scan_interval'] = 5
         app = ElmScanner(**scanner_parameters)
