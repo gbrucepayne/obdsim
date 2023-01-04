@@ -14,6 +14,7 @@ from obdsim.elm import ElmProtocol
 
 DEVICE_UNDER_TEST = os.getenv('DEVICE_UNDER_TEST')
 VEHICLE_BUS = os.getenv('VEHICLE_BUS')
+SCAN_INTERVAL = int(os.getenv('SCAN_INTERVAL', 5))
 
 format_csv = ('%(asctime)s.%(msecs)03dZ,[%(levelname)s],(%(threadName)s)'
               '%(module)s.%(funcName)s:%(lineno)d, %(message)s')
@@ -61,7 +62,7 @@ def main():
             raise ConnectionError('Unable to pair Bluetooth using PIN')
         scanner_parameters ['bluetooth'] = (device_address, device_channel)
     try:
-        scanner_parameters['scan_interval'] = 5
+        scanner_parameters['scan_interval'] = SCAN_INTERVAL
         app = ElmScanner(**scanner_parameters)
         app.connect()
         print(f'ELM version: {app.elm._version}')
