@@ -81,6 +81,7 @@ class Elm327:
         self._initialized = False
         self._timeout_count: int = 0
         self._max_timeouts = int(kwargs.get('max_timeouts', 3))
+        self._protocol_confirmed = False
     
     def _parse_kwargs(self,
                       src_kwargs: dict,
@@ -233,7 +234,7 @@ class Elm327:
             'headers_off': 'ATH0',
             'linefeed_off': 'ATL0',
             'adaptive_timing': 'ATAT1',
-            'auto_protocol': f'ATSP{protocol.value}',
+            'auto_protocol': f'ATSPA{protocol.value}',
         }
         for tag, command in settings.items():
             res = self.get_response(command)
@@ -271,14 +272,16 @@ class Elm327:
     
     @property
     def status(self) -> ElmStatus:
-        protocol = self.protocol
-        if protocol > 0:
-            return ElmStatus.CAR_CONNECTED
-        if protocol == 0:
+        if not self._protocol_confirmed:
             _log.debug('Using Mode 1 PID 0 for protocol detection')
             pids_a = self.get_response('0100', timeout=10, remove_prompt=False)
             if 'UNABLE TO CONNECT' not in pids_a:
+                self._protocol_confirmed = True
                 return ElmStatus.CAR_CONNECTED
+            return ElmStatus.OBD_CONNECTED
+        protocol = self.protocol
+        if protocol > 0:
+            return ElmStatus.CAR_CONNECTED
         if self.voltage and self.voltage > 6:
             return ElmStatus.OBD_CONNECTED
         if self.initialized:
