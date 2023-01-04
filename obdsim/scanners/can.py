@@ -19,11 +19,11 @@ class CanScanner(ObdScanner):
     
     __doc__ = f'{ObdScanner.__doc__}\n{__doc__}'
     
-    def __init__(self, canbus: can.Bus = None, **kwargs) -> None:
+    def __init__(self, bus_name: str = None, **kwargs) -> None:
         """Create a CAN scanner.
         
         Args:
-            canbus (can.Bus): The CANbus name e.g. `vcan0`
+            bus_name (str): The CANbus name e.g. `can0`
             scan_interval (float): The interval in seconds to scan PIDs.
                 Default `1.0`
             scan_timeout (float): The timeout waiting for a response.
@@ -34,12 +34,24 @@ class CanScanner(ObdScanner):
         
         """
         super().__init__(**kwargs)
-        self.bus: can.Bus = canbus
+        self._bus_name = bus_name
+        self.bus: can.Bus = None
 
-    def connect(self, bus_name):
-        """Connects to the OBD2 CANbus."""
+    def connect(self, bus_name: str = None):
+        """Connects to the OBD2 CANbus.
+        
+        Args:
+            bus_name: The CANbus name e.g. `can0`. Not required if the name
+                was specified during creation.
+        
+        """
         if not bus_name:
-            raise ValueError('Missing bus_name')
+            if not self._bus_name:
+                raise ValueError('Missing bus_name')
+            else:
+                bus_name = self._bus_name
+        elif not self._bus_name:
+            self._bus_name = bus_name
         sys_name = f'/sys/class/net/{bus_name}'
         if not os.path.exists(sys_name):
             raise FileNotFoundError(f'Cannot find {sys_name}')
@@ -48,7 +60,7 @@ class CanScanner(ObdScanner):
     
     @property
     def is_connected(self) -> bool:
-        return isinstance(self.bus, can.Bus)
+        return self.bus is not None
     
     def query(self, pid: int, mode: int = 1) -> 'ObdSignal|None':
         """Returns the result of an OBD2 query via CANbus."""

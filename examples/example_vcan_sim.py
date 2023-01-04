@@ -21,11 +21,11 @@ logger.addHandler(handler)
 def main():
     if not os.path.exists('/sys/class/net/vcan0'):
         create_vcan('vcan0')
-    vehicle = ObdSimulator()
-    vehicle.connect('vcan0')
+    vehicle = ObdSimulator('vcan0')
+    vehicle.connect()
     vehicle.start()
-    app = CanScanner()
-    app.connect('vcan0')
+    app = CanScanner('vcan0')
+    app.connect()
     app.start()
 
 
