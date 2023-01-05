@@ -141,6 +141,7 @@ class ObdSimulator:
                 _log.warning(f'Unhandled Mode 01 PID {pid}')
                 response = None
         if response:
+            _log.info(f'Simulating response: {response}')
             data = self._obd_msg.encode(response)
             message = can.Message(arbitration_id=self._obd_msg.frame_id,
                                   data=data)
