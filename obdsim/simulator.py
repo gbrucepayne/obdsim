@@ -138,7 +138,7 @@ class ObdSimulator:
                 response = None
         if response:
             _log.info(f'Simulating response: {response}')
-            data = self._obd_req.encode(response)
+            data = self._obd_res.encode(response)
             if extended_id is None:
                 extended_id = self._obd_res.frame_id < 2**11
             else:
