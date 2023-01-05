@@ -9,12 +9,11 @@ sys.path.append(f'{os.getcwd()}')
 from obdsim.bluetooth.ble import BleUartBridge, scan_ble
 from obdsim.bluetooth.btc import scan_btc, pair_with_pin
 from obdsim.scanners import ElmScanner
-from obdsim.simulator import ObdSimulator
 from obdsim.elm import ElmProtocol
 
 DEVICE_UNDER_TEST = os.getenv('DEVICE_UNDER_TEST')
-VEHICLE_BUS = os.getenv('VEHICLE_BUS')
 SCAN_INTERVAL = int(os.getenv('SCAN_INTERVAL', 5))
+ELM_PROTOCOL = int(os.getenv('ELM_PROTOCOL', 0))
 
 format_csv = ('%(asctime)s.%(msecs)03dZ,[%(levelname)s],(%(threadName)s)'
               '%(module)s.%(funcName)s:%(lineno)d, %(message)s')
@@ -38,11 +37,8 @@ def main():
         elif 'btc' in config:
             ble_parameters = None
             btc_parameters = config['btc']
-    if VEHICLE_BUS:
-        vehicle = ObdSimulator(VEHICLE_BUS)
-        vehicle.connect()
-        vehicle.start()
-        scanner_parameters['protocol'] = ElmProtocol.ISO_15765_4_11_500
+    if ELM_PROTOCOL:
+        scanner_parameters['protocol'] = ElmProtocol(ELM_PROTOCOL)
     if isinstance(ble_parameters, dict) and not ble_parameters:
         ble_parameters = asyncio.run(scan_ble(device_names))
     if ble_parameters:
@@ -67,12 +63,11 @@ def main():
         app.connect()
         print(f'ELM version: {app.elm._version}')
         print(f'ELM status: {app.elm.status.name}')
-        app.start()
+        if app.is_connected:
+            app.start()
     except Exception as err:
         logger.exception(err)
         app.stop()
-        # if simulate_vehicle:
-        #     vehicle.stop()
 
 
 if __name__ == '__main__':
