@@ -99,8 +99,9 @@ class Elm327:
                 self._connection.connect(self._connection_kwargs['bluetooth'])
                 return
             except (OSError) as err:
-                # TODO: add bluetooth errors such as PIN
                 if isinstance(err, OSError) and err.errno != 115:
+                    if err.errno == 52:
+                        _log.error('Suspected Bluetooth PIN code error')
                     raise err
         else:
             auto_baud = False
@@ -170,6 +171,8 @@ class Elm327:
             A list of non-empty strings.
             
         """
+        if not data.startswith('AT'):
+            _log.debug(f'Transmitting on OBD2: {data}')
         self.flush()
         to_send = f'{data}{self.TERMINATOR}'.encode('utf-8')
         if isinstance(self._connection, Socket):
@@ -213,7 +216,20 @@ class Elm327:
     def initialize(self,
                    attempts: int = 0,
                    max_attempts: int = 3,
-                   protocol: ElmProtocol = None):
+                   protocol: ElmProtocol = None,
+                   auto_protocol: bool = True):
+        """Initializes the ELM device.
+        
+        Args:
+            attempts: Only used if retrying due to non-response.
+            max_attempts: Optional threshold for failing after non-response.
+            protocol: Optional specify protocol to be used, uses AUTO if None.
+            auto_protocol: Optional, set False to override automatic fallback.
+        
+        Raises:
+            `ConnectionError` if no response from ELM device after max_attempts.
+            
+        """
         _log.info('Initializing ELM device...')
         if attempts >= max_attempts:
             raise ConnectionError('No response from ELM')
@@ -222,7 +238,7 @@ class Elm327:
             attempts += 1
             _log.warning('Invalid response from ELM reset - retrying...')
             time.sleep(1)
-            self.initialize(attempts)
+            self.initialize(attempts=attempts)
         for s in reset:
             if s.startswith('ELM'):
                 self._version = s
@@ -234,12 +250,16 @@ class Elm327:
             'headers_off': 'ATH0',
             'linefeed_off': 'ATL0',
             'adaptive_timing': 'ATAT1',
-            'auto_protocol': f'ATSPA{protocol.value}',
+            'protocol': f'ATSPA{protocol.value}',
         }
         for tag, command in settings.items():
+            if tag == 'protocol' and protocol.value > ElmProtocol.AUTO:
+                _log.info(f'Using protocol {protocol.name}')
+                if auto_protocol is False:
+                    command = command.replace('PA', 'P')
             res = self.get_response(command)
             if 'OK' not in res:
-                _log.warning(f'Unexpected {command} response: {res}')
+                _log.warning(f'{tag} unexpected {command} response: {res}')
         self._initialized = True
         _log.debug(f'{self._version} initialized')
         
@@ -273,7 +293,7 @@ class Elm327:
     @property
     def status(self) -> ElmStatus:
         if not self._protocol_confirmed:
-            _log.debug('Using Mode 1 PID 0 for protocol detection')
+            _log.info('Attempting to detect vehicle protocol...')
             pids_a = self.get_response('0100', timeout=10, remove_prompt=False)
             if 'UNABLE TO CONNECT' not in pids_a:
                 self._protocol_confirmed = True
