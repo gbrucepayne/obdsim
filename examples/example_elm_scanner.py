@@ -64,6 +64,7 @@ def main():
         print(f'ELM version: {app.elm._version}')
         print(f'ELM status: {app.elm.status.name}')
         if app.is_connected:
+            print(f'Vehicle bus protocol: {app.elm.protocol}')
             app.start()
     except Exception as err:
         logger.exception(err)
