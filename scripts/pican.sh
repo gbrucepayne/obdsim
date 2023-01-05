@@ -47,8 +47,8 @@ fi
 if [ "${ENABLE}" == 1 ]; then
   modprobe can
   modprobe can_raw
-  ip link set up "${NAME}" type can bitrate 500000 restart-ms 100
+  ip link set up "${NAME}" type can bitrate "${BITRATE}" restart-ms 100
 else
   ip link set "${NAME}" down
-  ip link delete "${NAME}"
+  ip link del "${NAME}"
 fi
