@@ -54,7 +54,7 @@ class ElmScanner(ObdScanner):
     def connect(self, **kwargs):
         """Connects to the ELM327 adapter."""
         self.elm.connect()
-        self.elm.initialize()
+        self.elm.initialize(auto_protocol=kwargs.get('auto_protocol', True))
     
     @property
     def is_connected(self) -> bool:
