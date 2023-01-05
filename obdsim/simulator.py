@@ -2,7 +2,7 @@
 import logging
 import os
 import threading
-from time import sleep
+import time
 
 import can
 from cantools.database import Database as CanDatabase
@@ -77,28 +77,25 @@ class ObdSimulator:
         """Loops checking for incoming requests on the CANbus."""
         _log.info(f'Listening on {self._bus_name}...')
         while True:
-            if self._bus is None:
-                continue
             received = self._bus.recv(timeout=self.timeout)
             if received:
-                _log.debug(f'CANbus received: {received.data}')
+                _log.info(f'CANbus received: {received.data}')
                 try:
                     decoded = self._db.decode_message(received.arbitration_id,
                                                      received.data)
-                    _log.debug(f'Decoded: {decoded}')
+                    _log.info(f'Decoded: {decoded}')
                     if 'request' in decoded:
                         self._process_request(decoded)
                     else:
                         _log.debug(f'Ignoring message: {decoded}')
                 except KeyError:
                     _log.error(f'Error decoding CAN message: {received}')
-            sleep(0.1)
     
     def send_response(self, message: can.Message):
         """Sends a response message on the CANbus."""
         if not isinstance(message, can.Message):
             raise ValueError('Invalid CAN Message')
-        _log.debug(f'Sending raw CAN data: {message.data}')
+        _log.info(f'Sending raw CAN data: {message.data}')
         self._bus.send(message)
         
     def _process_request(self, request):
@@ -110,7 +107,7 @@ class ObdSimulator:
         #     'ParameterID_Service01': 13,   # pid (decimal)
         #     'S1_PID_0D_VehicleSpeed': 50,
         # }
-        _log.debug(f'Processing {request}')
+        _log.info(f'Processing {request}')
         response = None
         if 'service' not in request:
             raise ValueError('OBD request or db missing mode')
