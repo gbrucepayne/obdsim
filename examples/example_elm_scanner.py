@@ -29,6 +29,7 @@ def main():
     ble_parameters = {}
     btc_parameters = {}
     scanner_parameters = {}
+    auto_protocol = True
     device_names = ['Vlink', 'OBDII']
     if DEVICE_UNDER_TEST:
         config = json.loads(DEVICE_UNDER_TEST)
@@ -39,6 +40,7 @@ def main():
             btc_parameters = config['btc']
     if ELM_PROTOCOL:
         scanner_parameters['protocol'] = ElmProtocol(ELM_PROTOCOL)
+        auto_protocol = False
     if isinstance(ble_parameters, dict) and not ble_parameters:
         ble_parameters = asyncio.run(scan_ble(device_names))
     if ble_parameters:
@@ -60,7 +62,7 @@ def main():
     try:
         scanner_parameters['scan_interval'] = SCAN_INTERVAL
         app = ElmScanner(**scanner_parameters)
-        app.connect()
+        app.connect(auto_protocol=auto_protocol)
         print(f'ELM version: {app.elm._version}')
         print(f'ELM status: {app.elm.status.name}')
         if app.is_connected:
