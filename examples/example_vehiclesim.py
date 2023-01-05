@@ -23,6 +23,8 @@ def main():
         vehicle = ObdSimulator(VEHICLE_BUS)
         vehicle.connect()
         vehicle.start()
+        while True:
+            pass
     except Exception as err:
         logger.exception(err)
 
