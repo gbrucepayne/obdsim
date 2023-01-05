@@ -218,7 +218,9 @@ class Elm327:
                    attempts: int = 0,
                    max_attempts: int = 3,
                    protocol: ElmProtocol = None,
-                   auto_protocol: bool = True):
+                   auto_protocol: bool = True,
+                   adaptive_timing: bool = True,
+                   ) -> None:
         """Initializes the ELM device.
         
         Args:
@@ -226,6 +228,7 @@ class Elm327:
             max_attempts: Optional threshold for failing after non-response.
             protocol: Optional specify protocol to be used, uses AUTO if None.
             auto_protocol: Optional, set False to override automatic fallback.
+            adaptive_timing: Optional if False uses maximum timeout value.
         
         Raises:
             `ConnectionError` if no response from ELM device after max_attempts.
@@ -247,12 +250,15 @@ class Elm327:
         if not protocol:
             protocol = self._elm_kwargs.get('protocol', ElmProtocol.AUTO)
         settings = {
-            'echo_off': 'ATE0',
-            'headers_off': 'ATH0',
-            'linefeed_off': 'ATL0',
-            'adaptive_timing': 'ATAT1',
-            'protocol': f'ATSPA{protocol.value}',
+            'echo_off': 'AT E0',
+            'headers_off': 'AT H0',
+            'linefeed_off': 'AT L0',
+            'protocol': f'AT SPA{protocol.value}',
         }
+        if adaptive_timing is True:
+            settings['adaptive_timing'] = 'AT AT1'
+        else:
+            settings['simulator_timing'] = 'AT ST FF'
         for tag, command in settings.items():
             if tag == 'protocol' and protocol.value > ElmProtocol.AUTO:
                 _log.info(f'Using protocol {protocol.name}')
