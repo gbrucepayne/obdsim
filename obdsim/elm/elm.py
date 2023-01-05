@@ -81,7 +81,7 @@ class Elm327:
         self._initialized = False
         self._timeout_count: int = 0
         self._max_timeouts = int(kwargs.get('max_timeouts', 3))
-        self._protocol_confirmed = False
+        self._protocol_confirmed = None
     
     def _parse_kwargs(self,
                       src_kwargs: dict,
@@ -211,6 +211,7 @@ class Elm327:
     def _handle_disconnect(self):
         _log.warning('Not implemented')
         self._initialized = False
+        self._protocol_confirmed = None
         self._timeout_count = 0
         
     def initialize(self,
@@ -282,6 +283,8 @@ class Elm327:
     
     @property
     def protocol(self) -> ElmProtocol:
+        if self._protocol_confirmed is not None:
+            return self._protocol_confirmed
         protocol = self.get_response('ATDPN')
         try:
             protocol_number = int(protocol[0].lower().replace('a', ''))
@@ -292,11 +295,11 @@ class Elm327:
     
     @property
     def status(self) -> ElmStatus:
-        if not self._protocol_confirmed:
+        if self._protocol_confirmed is None:
             _log.info('Attempting to detect vehicle protocol...')
             pids_a = self.get_response('0100', timeout=10, remove_prompt=False)
             if 'UNABLE TO CONNECT' not in pids_a:
-                self._protocol_confirmed = True
+                self._protocol_confirmed = self.protocol
                 return ElmStatus.CAR_CONNECTED
             return ElmStatus.OBD_CONNECTED
         protocol = self.protocol
@@ -334,6 +337,8 @@ class Elm327:
         if pid not in range(0,256):
             raise ValueError(f'Invalid PID: {pid}')
         res = self.get_response(f'{mode:02x}{pid:02x}')
+        if 'NO DATA' in res:
+            raise ConnectionError('ELM timeout indicates NO DATA')
         if 'SEARCHING...' in res:
             res.remove('SEARCHING...')
         if 'UNABLE TO CONNECT' in res:
