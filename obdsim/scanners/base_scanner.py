@@ -84,9 +84,12 @@ class ObdScanner:
     
     def start(self):
         """Starts OBD scanning."""
+        _log.info('Starting PID scanning')
         self._pids_supported = { 1: [] }
         self._signals = { 1: {} }
         self._get_pids_supported()
+        if not self.pids_supported:
+            raise ConnectionError('Unable to determine supported PIDs')
         _log.info(f'PIDs supported: {self.pids_supported}')
         self._running = True
         self._loop()
@@ -101,10 +104,10 @@ class ObdScanner:
     
     def _get_pids_supported(self):
         """Queries the vehicle bus for supported PIDs."""
-        if not self.is_connected:
-            _log.warning('Vehicle is not connected - skipping')
-            self._pids_supported = {}
-            return
+        # if not self.is_connected:
+        #     _log.warning('Vehicle is not connected - skipping')
+        #     self._pids_supported = {}
+        #     return
         pid_commands = {
             1: ['PIDS_A', 'PIDS_B', 'PIDS_C'],
         }
@@ -129,9 +132,9 @@ class ObdScanner:
         Repeats at the scan_interval.
         """
         if self._running:
-            if not self.pids_supported:
-                _log.warning('No PIDS found - re-initializing')
-                self._get_pids_supported()
+            # if not self.pids_supported:
+            #     _log.warning('No PIDS found - re-initializing')
+            #     self._get_pids_supported()
             for mode, pids_supported in self.pids_supported.items():
                 for pid in pids_supported:
                     signal = self.query(pid, mode)
