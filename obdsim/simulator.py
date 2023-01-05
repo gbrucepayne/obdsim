@@ -90,6 +90,7 @@ class ObdSimulator:
                     else:
                         _log.debug(f'Ignoring message: {decoded}')
                 except Exception as err:
+                    _log.warning('TODO: allow/warn message decode errors')
                     _log.error(f'Error decoding CAN message: {err}')
                     raise err
             sleep(0.1)
