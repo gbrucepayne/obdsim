@@ -95,7 +95,7 @@ class ObdSimulator:
         """Sends a response message on the CANbus."""
         if not isinstance(message, can.Message):
             raise ValueError('Invalid CAN Message')
-        _log.info(f'Sending raw CAN data: {message.data}')
+        _log.info(f'Sending raw CAN data: {message}')
         self._bus.send(message)
         
     def _process_request(self, request):
@@ -141,6 +141,7 @@ class ObdSimulator:
             _log.info(f'Simulating response: {response}')
             data = self._obd_msg.encode(response)
             message = can.Message(arbitration_id=self._obd_msg.frame_id,
+                                  is_extended_id=False,
                                   data=data)
             self.send_response(message)
         else:
