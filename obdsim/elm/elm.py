@@ -297,11 +297,13 @@ class Elm327:
     def status(self) -> ElmStatus:
         if self._protocol_confirmed is None:
             _log.info('Attempting to detect vehicle protocol...')
-            pids_a = self.get_response('0100', timeout=10, remove_prompt=False)
-            if 'UNABLE TO CONNECT' not in pids_a:
-                self._protocol_confirmed = self.protocol
-                return ElmStatus.CAR_CONNECTED
-            return ElmStatus.OBD_CONNECTED
+            res = self.get_response('0100', timeout=10, remove_prompt=False)
+            if any(x in res for x in ['UNABLE TO CONNECT', 'NO DATA']):
+                if 'NO DATA' in res:
+                    _log.warning('ELM timeout of data response')
+                return ElmStatus.OBD_CONNECTED
+            self._protocol_confirmed = self.protocol
+            return ElmStatus.CAR_CONNECTED
         protocol = self.protocol
         if protocol > 0:
             return ElmStatus.CAR_CONNECTED
