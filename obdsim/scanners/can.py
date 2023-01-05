@@ -64,7 +64,8 @@ class CanScanner(ObdScanner):
     
     def query(self, pid: int, mode: int = 1) -> 'ObdSignal|None':
         """Returns the result of an OBD2 query via CANbus."""
-        pid_mode_str = f'PID_MODE_{mode:02d}'
+        # pid_mode_str = f'PID_MODE_{mode:02d}'   #: for CSS example
+        pid_mode_str = 'PID'   #: Simplified DBC
         content = {
             'request': 0,
             'service': mode,

@@ -25,6 +25,12 @@ on using Linux **`bluetoothctl`** to pair the device manually, then map to a
 
 I wanted to find a way to automate all that.
 
+## DBC File
+
+### Resources
+
+* http://mcu.so/Microcontroller/Automotive/DBC_File_Format_Documentation.pdf
+
 ## Python CAN BUS tools
 
 The [**`cantools`**](https://cantools.readthedocs.io/en/latest/) library
@@ -153,4 +159,9 @@ Find the scanner name e.g. containing **Vlink** and copy its MAC address.
 Next bind the adapter to a serial port `/dev/rfcomm0`:
 ```
 sudo rfcomm bind rfcomm0 <MAC>
+```
+
+When finished it can then be released:
+```
+sudo rfcomm release rfcomm0
 ```

@@ -103,8 +103,8 @@ class ObdSimulator:
         #     'length': 3,
         #     'request': 0,
         #     'service': 1,   # mode
-        #     'ParameterID_Service01': 13,   # pid (decimal)
-        #     'S1_PID_0D_VehicleSpeed': 50,
+        #     'PID': 13,   # pid (decimal)
+        #     'SPEED': 50,   # derived from DBC
         # }
         _log.info(f'Processing {request}')
         response = None
@@ -112,13 +112,13 @@ class ObdSimulator:
             raise ValueError('OBD request or db missing mode')
         if request['service'] == 1:
             _log.debug(f'Simulating mode 1 response')
-            if 'PID_MODE_01' not in request:
+            if 'PID' not in request:
                 raise ValueError('Missing PID for Mode 1')
-            pid = request['PID_MODE_01']
+            pid = request['PID']
             response = {
                 'response': 4,
                 'service': 1,
-                'PID_MODE_01': pid,
+                'PID': pid,
             }
             if pid == 0:
                 response['length'] = 6
