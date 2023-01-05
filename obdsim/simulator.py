@@ -75,6 +75,7 @@ class ObdSimulator:
     
     def _listen(self):
         """Loops checking for incoming requests on the CANbus."""
+        _log.info(f'Listening on {self._bus_name}...')
         while True:
             if self._bus is None:
                 continue
@@ -89,10 +90,8 @@ class ObdSimulator:
                         self._process_request(decoded)
                     else:
                         _log.debug(f'Ignoring message: {decoded}')
-                except Exception as err:
-                    _log.warning('TODO: allow/warn message decode errors')
-                    _log.error(f'Error decoding CAN message: {err}')
-                    raise err
+                except KeyError:
+                    _log.error(f'Error decoding CAN message: {received}')
             sleep(0.1)
     
     def send_response(self, message: can.Message):
