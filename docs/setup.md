@@ -132,6 +132,7 @@ Bluetooth or `/dev/pts` for pseudoterminals.
 * Some of the names are counterintuitive e.g. `PIDS_A` rather than `PIDS_01_20`.
 * `obd.Async` isn't based on `asyncio`.
 * DEBUG logging is verbose and distracting, doesn't follow best practices.
+* Only supports Service/Mode 01 current data
 
 ## Manual Bluetooth
 
