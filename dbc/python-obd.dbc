@@ -165,6 +165,8 @@ BO_ 2024 OBD2_ECU_RESPONSE: 8 Vector__XXX
  SG_ S1_PID_A0_PIDsSupported_A1_C0 m160 : 31|32@0+ (1,0) [0|4294967295] "" Vector__XXX
  SG_ S1_PID_C0_PIDsSupported_C1_E0 m192 : 31|32@0+ (1,0) [0|4294967295] "" Vector__XXX
  SG_ S2_SHOW_FREEZE_DATA m2 : 31|16@0+ (1,0) [0|65535] "" Vector__XXX
+ SG_ S9_PIDS_01_20 m0 : 31|32@0+ (1,0) [0|4294967295] "" Vector__XXX
+ SG_ S9_VIN_MCOUNT m1 : 31|8@0+ (1,0) [0|255] "" Vector__XXX
  SG_ S9_VIN m2 : 31|32@0+ (1,0) [0|4294967295] "" Vector__XXX
  SG_ PID_S1 m1M : 23|8@0+ (1,0) [0|255] "" Vector__XXX
  SG_ PID_S2 m2M : 23|8@0+ (1,0) [0|255] "" Vector__XXX
@@ -207,7 +209,7 @@ VAL_ 2024 OBD_COMPLIANCE 1 "OBD-II as defined by the CARB" 2 "OBD as defined by 
 VAL_ 2024 FUEL_TYPE 0 "Not available" 1 "Gasoline" 2 "Methanol" 3 "Ethanol" 4 "Diesel" 5 "LPG" 6 "CNG" 7 "Propane" 8 "Electric" 9 "Bifuel running Gasoline" 10 "Bifuel running Methanol" 11 "Bifuel running Ethanol" 12 "Bifuel running LPG" 13 "Bifuel running CNG" 14 "Bifuel running Propane" 15 "Bifuel running Electricity" 16 "Bifuel electric/comb. eng." 17 "Hybrid gasoline" 18 "Hybrid Ethanol" 19 "Hybrid Diesel" 20 "Hybrid Electric" 21 "Hybrid running electric/comb." 22 "Hybrid Regenerative" 23 "Bifuel running diesel" ;
 VAL_ 2024 PID_S1 0 "PIDS_A" 1 "STATUS" 2 "FREEZE_DTC" 3 "FUEL_STATUS" 4 "ENGINE_LOAD" 5 "COOLANT_TEMP" 6 "SHORT_FUEL_TRIM_1" 7 "LONG_FUEL_TRIM_1" 8 "SHORT_FUEL_TRIM_2" 9 "LONG_FUEL_TRIM_2" 10 "FUEL_PRESSURE" 11 "INTAKE_PRESSURE" 12 "RPM" 13 "SPEED" 14 "TIMING_ADVANCE" 15 "INTAKE_TEMP" 16 "MAF" 17 "THROTTLE_POS" 18 "AIR_STATUS" 20 "S1_PID_14_OxySensor1" 21 "S1_PID_15_OxySensor2" 22 "S1_PID_16_OxySensor3" 23 "S1_PID_17_OxySensor4" 24 "S1_PID_18_OxySensor5" 25 "S1_PID_19_OxySensor6" 26 "S1_PID_1A_OxySensor7" 27 "S1_PID_1B_OxySensor8" 28 "OBD_COMPLIANCE" 31 "RUN_TIME" 32 "PIDS_B" 33 "DISTANCE_W_MIL" 34 "FUEL_RAIL_PRESSURE_VAC" 35 "FUEL_RAIL_PRESSURE_DIRECT" 36 "S1_PID_24_OxySensor1" 37 "S1_PID_25_OxySensor2" 38 "S1_PID_26_OxySensor3" 39 "S1_PID_27_OxySensor4" 40 "S1_PID_28_OxySensor5" 41 "S1_PID_29_OxySensor6" 42 "S1_PID_2A_OxySensor7" 43 "S1_PID_2B_OxySensor8" 44 "COMMANDED_EGR" 45 "EGR_ERROR" 46 "EVAPORATIVE_PURGE" 47 "FUEL_LEVEL" 48 "WARMUPS_SINCE_DTC_CLEAR" 49 "DISTANCE_SINCE_DTC_CLEAR" 50 "EVAP_VAPOR_PRESSURE" 51 "BAROMETRIC_PRESSURE" 52 "S1_PID_34_OxySensor1" 53 "S1_PID_35_OxySensor2" 54 "S1_PID_36_OxySensor3" 55 "S1_PID_37_OxySensor4" 56 "S1_PID_38_OxySensor5" 57 "S1_PID_39_OxySensor6" 58 "S1_PID_3A_OxySensor7" 59 "S1_PID_3B_OxySensor8" 60 "CATALYST_TEMP_B1S1" 61 "CATALYST_TEMP_B2S1" 62 "CATALYST_TEMP_B1S2" 63 "CATALYST_TEMP_B2S2" 64 "PIDS_C" 65 "STATUS_DRIVE_CYCLE" 66 "CONTROL_MODULE_VOLTAGE" 67 "ABSOLUTE_LOAD" 68 "COMMANDED_EQUIV_RATIO" 69 "RELATIVE_THROTTLE_POS" 70 "AMBIANT_AIR_TEMP" 71 "THROTTLE_POS_B" 72 "THROTTLE_POS_C" 73 "ACCELERATOR_POS_D" 74 "ACCELERATOR_POS_E" 75 "ACCELERATOR_POS_F" 76 "THROTTLE_ACTUATOR" 77 "RUN_TIME_MIL" 78 "TIME_SINCE_DTC_CLEARED" 79 "S1_PID_4F_MaxMultiple" 80 "MAX_MAF" 81 "FUEL_TYPE" 82 "ETHANOL_PERCENT" 83 "EVAP_VAPOR_PRESSURE_ABS" 84 "EVAP_VAPOR_PRESSURE_ALT" 85 "S1_PID_55_ShortSecOxyTrimBankX" 86 "S1_PID_56_LongSecOxyTrimBankX" 87 "S1_PID_57_ShortSecOxyTrimBankX" 88 "S1_PID_58_LongSecOxyTrimBankX" 89 "FUEL_RAIL_PRESSURE_ABS" 90 "RELATIVE_ACCEL_POS" 91 "HYBRID_BATTERY_REMAINING" 92 "OIL_TEMP" 93 "FUEL_INJECT_TIMING" 94 "FUEL_RATE" 95 "S1_PID_5F_EmissionReq" 96 "S1_PID_60_PIDsSupported_61_80" 97 "S1_PID_61_DemandEngTorqPct" 98 "S1_PID_62_ActualEngTorqPct" 99 "S1_PID_63_EngRefTorq" 100 "S1_PID_64_EngPctTorq" 101 "S1_PID_65_AuxInputOutput" 102 "S1_PID_66_MAFSensor" 103 "S1_PID_67_EngineCoolantTemp" 104 "S1_PID_68_IntakeAirTempSens" 105 "S1_PID_69_CmdEGR_EGRError" 106 "S1_PID_6A_CmdDieselIntAir" 107 "S1_PID_6B_ExhaustGasTemp" 108 "S1_PID_6C_CmdThrottleActRel" 109 "S1_PID_6D_FuelPresContrSys" 110 "S1_PID_6E_InjPresContrSys" 111 "S1_PID_6F_TurboComprPres" 112 "S1_PID_70_BoostPresCntrl" 128 "S1_PID_80_PIDsSupported_81_A0" 142 "S1_PID_8E_EngFrictionPctTorq" 160 "S1_PID_A0_PIDsSupported_A1_C0" 192 "S1_PID_C0_PIDsSupported_C1_E0" ;
 VAL_ 2024 PID_S2 2 "S2_SHOW_FREEZE_DATA" ;
-VAL_ 2024 PID_S9 2 "S9_VIN" ;
+VAL_ 2024 PID_S9 0 "S9_PIDS_01_20" 1 "S9_VIN_MCOUNT" 2 "S9_VIN" ;
 VAL_ 2024 service 10 "Permanent DTCs (Cleared DTCs) " 9 "Request vehicle information " 8 "Control on-board system " 7 "Show pending DTCs " 6 "Other system monitoring " 5 "Oxygen sensor monitoring " 4 "Clear DTCs and stored values" 3 "Show stored DTCs " 2 "Show freeze frame data " 1 "Show current data " ;
 
 SG_MUL_VAL_ 2024 PIDS_A PID_S1 0-0;
@@ -360,6 +362,8 @@ SG_MUL_VAL_ 2024 S1_PID_8E_EngFrictionPctTorq PID_S1 142-142;
 SG_MUL_VAL_ 2024 S1_PID_A0_PIDsSupported_A1_C0 PID_S1 160-160;
 SG_MUL_VAL_ 2024 S1_PID_C0_PIDsSupported_C1_E0 PID_S1 192-192;
 SG_MUL_VAL_ 2024 S2_SHOW_FREEZE_DATA PID_S2 2-2;
+SG_MUL_VAL_ 2024 S9_PIDS_01_20 PID_S9 0-0;
+SG_MUL_VAL_ 2024 S9_VIN_MCOUNT PID_S9 1-1;
 SG_MUL_VAL_ 2024 S9_VIN PID_S9 2-2;
 SG_MUL_VAL_ 2024 PID_S1 service 1-1;
 SG_MUL_VAL_ 2024 PID_S2 service 2-2;
