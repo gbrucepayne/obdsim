@@ -26,6 +26,7 @@ def main():
     vehicle.start()
     app = CanScanner('vcan0')
     app.connect()
+    vin = app.query(2, 2)
     app.start()
 
 
