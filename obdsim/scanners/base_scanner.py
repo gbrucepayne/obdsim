@@ -13,7 +13,7 @@ from obdsim import ObdSignal
 
 DBC_FILE = os.getenv('DBC_FILE', './dbc/python-obd.dbc')
 DBC_REQUEST = os.getenv('DBC_REQUEST', 'OBD2_REQUEST')
-DBC_RESPONSE = os.getenv('DBC_RESPONSE', 'OBD2_RESPONSE')
+DBC_RESPONSE = os.getenv('DBC_RESPONSE', 'OBD2_ECU_RESPONSE')
 
 _log = logging.getLogger(__name__)
 
@@ -110,6 +110,7 @@ class ObdScanner:
         #     return
         pid_commands = {
             1: ['PIDS_A', 'PIDS_B', 'PIDS_C'],
+            # 9: [],
         }
         for mode, cmds in pid_commands.items():
             for cmd in cmds:

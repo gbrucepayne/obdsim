@@ -13,7 +13,7 @@ from . import ObdSignal
 
 DBC_FILE = os.getenv('DBC_FILE', './dbc/python-obd.dbc')
 DBC_REQUEST = os.getenv('DBC_REQUEST', 'OBD2_REQUEST')
-DBC_RESPONSE = os.getenv('DBC_RESPONSE', 'OBD2_RESPONSE')
+DBC_RESPONSE = os.getenv('DBC_RESPONSE', 'OBD2_ECU_RESPONSE')
 
 _log = logging.getLogger(__name__)
 
@@ -100,25 +100,27 @@ class ObdSimulator:
     def _process_request(self, request, extended_id: bool = None):
         """Parses a request and generates a response."""
         # request = {
-        #     'length': 3,
-        #     'request': 0,
-        #     'service': 1,   # mode
-        #     'PID': 13,   # pid (decimal)
+        #     'length': 2,   # number of bytes in request or response
+        #     'request': 0,   # first 4 bits of Mode indicating direction
+        #     'service': 1,   # mode mux defined in DBC
+        #     'PID_S1': 13,   # PID mux defined in DBC
         #     'SPEED': 50,   # derived from DBC
         # }
         _log.info(f'Processing {request}')
         response = None
         if 'service' not in request:
             raise ValueError('OBD request or db missing mode')
-        if request['service'] == 1:
+        service_mode = request['service']
+        pid_mux = f'PID_S{service_mode:01x}'
+        if service_mode == 1:
             _log.debug(f'Simulating mode 1 response')
-            if 'PID' not in request:
+            if pid_mux not in request:
                 raise ValueError('Missing PID for Mode 1')
-            pid = request['PID']
+            pid = request[pid_mux]
             response = {
                 'response': 4,
                 'service': 1,
-                'PID': pid,
+                pid_mux: pid,
             }
             if pid == 0:
                 response['length'] = 6
@@ -136,6 +138,8 @@ class ObdSimulator:
             else:
                 _log.warning(f'Unhandled Mode 01 PID {pid}')
                 response = None
+        elif service_mode == 9:
+            raise NotImplementedError('TODO mode 9 pid 2 VIN')
         if response:
             _log.info(f'Simulating response: {response}')
             data = self._obd_res.encode(response)

@@ -65,20 +65,23 @@ class CanScanner(ObdScanner):
     def query(self, pid: int, mode: int = 1) -> 'ObdSignal|None':
         """Returns the result of an OBD2 query via CANbus."""
         # pid_mode_str = f'PID_MODE_{mode:02d}'   #: for CSS example
-        pid_mode_str = 'PID'   #: Simplified DBC
+        pid_mux = f'PID_S{mode:01x}'   #: Simplified DBC
         content = {
             'request': 0,
             'service': mode,
             'length': 2,
-            pid_mode_str: pid,
+            pid_mux: pid,
         }
         data = self._obd_req.encode(content)
         request = can.Message(arbitration_id=self._obd_req.frame_id,
+                              is_extended_id=self._obd_req.frame_id >= 2**1,
                               data=data)
         response = None
         signal = None
         self.bus.send(request)
-        while response is None:
+        attempts = 0
+        while response is None and attempts < 3:
+            attempts += 1
             response = self.bus.recv(timeout=self.scan_timeout)
             if response:
                 try:
@@ -86,10 +89,9 @@ class CanScanner(ObdScanner):
                     decoded = self._db.decode_message(response.arbitration_id,
                                                       response.data)
                     _log.debug(f'CANbus received: {decoded}')
-                    pid = ObdSignal.get_pid_by_name(decoded[pid_mode_str])
+                    pid = ObdSignal.get_pid_by_name(decoded[pid_mux])
                     value = decoded[ObdSignal.get_name_by_pid(pid)]
                     signal = ObdSignal(1, pid, value, response_time)
                 except Exception as err:
                     _log.error(err)
-            time.sleep(0.1)
         return signal
