@@ -67,11 +67,16 @@ class ElmScanner(ObdScanner):
             return
         res: bytes = self.elm.query_pid(pid, mode)
         if res:
-            res_mode = res[0]
-            res_pid = res[1]
-            res_data = res[2:]
-            decoded = self._db.decode_message(self._obd_res.frame_id, res)
-            # TODO: decode result
-            value = 999   #: placeholder
             response_time = time.time()
-            return ObdSignal(mode, pid, value, response_time)
+            while len(res) < 8:
+                _log.debug(f'Padding ELM response with zero byte')
+                res = bytearray(res + b'\x00')
+            decoded = self._db.decode_message(self._obd_res.frame_id, res)
+            rx_mode = decoded['service'].value
+            pid_mux = f'PID_S{mode:01x}'
+            rx_pid = decoded[pid_mux].value
+            if rx_mode != mode or rx_pid != pid:
+                _log.warning('Mode or PID mismatch')
+            value = decoded[ObdSignal.get_name_by_pid(rx_pid)]
+            return ObdSignal(rx_mode, rx_pid, value, response_time)
+        _log.warning(f'No response to query')
