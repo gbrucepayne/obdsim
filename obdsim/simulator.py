@@ -9,7 +9,7 @@ from cantools.database import Database as CanDatabase
 from cantools.database import Message as CanMessage
 from cantools.database import load_file as load_can_database
 
-from .obdsignal import ObdSignal, encode_pids_supported
+from obdsim.obdsignal import ObdSignal, encode_pids_supported
 
 DBC_FILE = os.getenv('DBC_FILE', './dbc/python-obd.dbc')
 DBC_REQUEST = os.getenv('DBC_REQUEST', 'OBD2_REQUEST')
@@ -164,7 +164,7 @@ class ObdSimulator:
                         data_hex += f'{ord(c):02x}'.upper()
                     data = bytes.fromhex(data_hex)
                     _log.debug(f'Sending VIN part {i + 1} of {len(vin_parts)}')
-                    self.send_response_data(data)
+                    self.send_response_data(data, extended_id)
                 return
                 # raise NotImplementedError('TODO mode 9 pid 2 VIN multi-line')
         else:
@@ -172,16 +172,14 @@ class ObdSimulator:
         if response:
             _log.info(f'Simulating response: {response}')
             data = self._obd_res.encode(response)
-            self.send_response_data(data)
+            self.send_response_data(data, extended_id)
         else:
             _log.warning(f'No response for {request}')
 
     def send_response_data(self, data: bytes, extended_id: bool = None):
         """Sends a response message on the CANbus."""
         if extended_id is None:
-            extended_id = self._obd_res.frame_id < 2**11
-        else:
-            _log.debug(f'Simulator forcing extended ID: {extended_id}')
+            extended_id = self._obd_res.frame_id >= 2**11
         message = can.Message(arbitration_id=self._obd_res.frame_id,
                               is_extended_id=extended_id,
                               data=data)
