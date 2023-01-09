@@ -352,10 +352,20 @@ class Elm327:
         if 'UNABLE TO CONNECT' in res:
             _log.warning('Unable to connect')
             raise ConnectionError('Vehicle is not connected')
-        data = res[0].replace(' ', '')
+        header_id, payload = res[0].split(' ', 1)
+        _log.debug(f'Response received from ECU ID {header_id}')
+        data_hex = payload.replace(' ', '')
+        obd2_length = int(data_hex[:2], 16)
+        obd2_payload_length = len(data_hex[2:]) / 2
+        if obd2_payload_length != obd2_length:
+            _log.warning(f'Expected {obd2_length} bytes'
+                         f' but received {obd2_payload_length}')
+        if len(data_hex) % 2 != 0:
+            _log.warning('Padding data with 0s')
+            data_hex += '0'
         if format == ObdResponseFormat.HEX_STRING:
-            return data
+            return data_hex
         elif format == ObdResponseFormat.RAW_BYTES:
-            return bytes.fromhex(data)
+            return bytes.fromhex(data_hex)
         else:
             raise NotImplementedError
