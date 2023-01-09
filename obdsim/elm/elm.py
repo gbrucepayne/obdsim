@@ -251,7 +251,7 @@ class Elm327:
             protocol = self._elm_kwargs.get('protocol', ElmProtocol.AUTO)
         settings = {
             'echo_off': 'AT E0',
-            'headers_off': 'AT H0',
+            'headers_on': 'AT H1',
             'linefeed_off': 'AT L0',
             'protocol': f'AT SPA{protocol.value}',
         }

@@ -2,11 +2,72 @@
 import time
 from enum import IntEnum
 
-from pint.unit import UnitRegistry, ScaleConverter, UnitDefinition
+import pint
+# from pint.unit import ScaleConverter, UnitDefinition
 
-ureg = UnitRegistry()
-Q = ureg.Quantity
-ureg.define(UnitDefinition('percent', 'pct', (), ScaleConverter(1 / 100.0)))
+ureg = pint.UnitRegistry()
+ureg.define('percent = [] = %')
+ureg.define('ratio = []')
+ureg.define('gps = gram / second = GPS = grams_per_second')
+ureg.define('lph = liter / hour = LPH = liters_per_hour')
+ureg.define('ppm = count / 1000000 = PPM = parts_per_million')
+# ureg.define(UnitDefinition('percent', 'pct', (), ScaleConverter(1 / 100.0)))
+Q_ = ureg.Quantity
+
+
+def decode_pids_supported(mode: int,
+                          pid: int,
+                          value: int,
+                          previous: dict = {},
+                          ) -> 'dict[int, list]':
+    """Decodes the PIDs supported bitmask to dictionary of PID lists.
+    
+    If a previous pids_supported dictionary is provided it will be updated
+    with the new mode and/or PIDs.
+    
+    Args:
+        mode: The service/mode number.
+        pid: The parameter ID number.
+        value: The raw value of the PID response.
+        previous: Optional previous dictionary to be updated.
+    
+    Returns:
+        A dictionary formatted as `{ mode: [<pids>] }
+        
+    """
+    supported = []
+    bitmask = f'{value:032b}'
+    for i, bit in enumerate(reversed(bitmask)):
+        if bit == '1':
+            supported.append(pid + i + 1)
+    supported.sort()
+    if previous:
+        if mode not in previous:
+            previous[mode] = []
+        previous[mode] = [p for p in supported if p not in previous[mode]].sort()
+        return previous
+    return { mode: supported }
+    
+
+def encode_pids_supported(pid: int, pid_list: 'list[int]') -> int:
+    """Encodes a list of pids for a reference PIDs supported.
+    
+    Args:
+        pid: The reference PID being encoded.
+        pid_list: The list of supported PIDs (within the given mode and range)
+    
+    Returns:
+        A 32-bit integer bitmask.
+        
+    """
+    if any(p not in range(0, 256) for p in pid_list):
+        raise ValueError('Invalid PID in list')
+    if any(p > pid + 32 for p in pid_list):
+        raise ValueError('PIDs in list must be within 32 of reference pid')
+    bitmask = 0
+    for p in list(set(pid_list)):
+        bitmask = bitmask | 1 << (p - 1)
+    return bitmask
 
 
 class ObdIgnitionType(IntEnum):
@@ -46,10 +107,21 @@ class ObdSignal:
         (0x1, 0x4, 'ENGINE_LOAD', ureg.percent),
         (0x1, 0xc, 'RPM', ureg.rpm),
         (0x1, 0xd, 'SPEED', ureg.kph),
-        # (0x9, 0x0, 'M09_PIDS_A', 'bitmask', 4),
+        (0x9, 0x0, 'S9_PIDS_01_20', 'bitmask', 4),
+        (0x9, 0x1, 'S9_VIN_MCOUNT', ureg.count, 4),
+        (0x9, 0x0, 'S9_VIN', None, 4),
     ]
     
     def __init__(self, mode: int, pid: int, value, ts: float = None) -> None:
+        """Creates an ObdSignal.
+        
+        Args:
+            mode: The OBD2 service/mode number
+            pid: The Parameter ID number
+            value: The decoded (raw) value
+            ts: The timestamp of the decoded value
+            
+        """
         self.mode: int = mode
         self.pid: int = pid
         self._length: int = 0
@@ -87,14 +159,8 @@ class ObdSignal:
     @property
     def value(self) -> ureg.Quantity:
         if self.unit == 'bitmask':
-            bitmask = format(self._value, '#034b')[2:]
-            offset = self.pid
-            supported_pids = []
-            for bit in bitmask:
-                offset += 1
-                if bit == '1' and offset not in supported_pids:
-                    supported_pids.append(offset)
-            return supported_pids
+            pid_list = decode_pids_supported(self.mode, self.pid, self._value)
+            return pid_list[self.mode]
         elif isinstance(self.unit, ObdStatus):
             raise NotImplementedError
         elif self.unit == ureg.percent:
@@ -138,3 +204,9 @@ class ObdSignal:
     def length(self) -> int:
         # TODO: populate length for different parameters
         return self._length
+
+
+def pid_definitions(dbc_filename: str) -> 'list':
+    """Builds PID definitions from a DBC file."""
+    raise NotImplementedError
+    return []

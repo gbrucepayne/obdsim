@@ -4,9 +4,9 @@ import sys
 
 sys.path.append(f'{os.getcwd()}')
 
-from obdsim.simulator import ObdSimulator
-from obdsim.scanners import CanScanner
-from obdsim.vcan import create_vcan
+from obdsim import ObdSimulator
+from obdsim.scanner import CanScanner
+from obdsim.utils.vcan import create_vcan
 
 format_csv = ('%(asctime)s.%(msecs)03dZ,[%(levelname)s],(%(threadName)s)'
               '%(module)s.%(funcName)s:%(lineno)d, %(message)s')
@@ -26,7 +26,9 @@ def main():
     vehicle.start()
     app = CanScanner('vcan0')
     app.connect()
-    vin = app.query(2, 2)
+    vin_msg_count = app.query(pid=1, mode=9)
+    vin = app.query(pid=2, mode=9)
+    print(f'VIN = {vin.value}')
     app.start()
 
 

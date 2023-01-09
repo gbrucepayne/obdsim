@@ -5,8 +5,7 @@ import time
 
 import can
 
-from obdsim.scanners import ObdScanner
-from obdsim import ObdSignal
+from .base_scanner import ObdScanner, ObdSignal
 
 _log = logging.getLogger(__name__)
 
@@ -64,7 +63,11 @@ class CanScanner(ObdScanner):
     
     def query(self, pid: int, mode: int = 1) -> 'ObdSignal|None':
         """Returns the result of an OBD2 query via CANbus."""
-        # pid_mode_str = f'PID_MODE_{mode:02d}'   #: for CSS example
+        if mode == 9 and pid == 2:
+            if not self.vin_message_count:
+                raise ValueError('Must query mode 9 pid 1 first'
+                                 'to determine response message count')
+            vin = ''
         pid_mux = f'PID_S{mode:01x}'   #: Simplified DBC
         content = {
             'request': 0,
@@ -76,22 +79,51 @@ class CanScanner(ObdScanner):
         request = can.Message(arbitration_id=self._obd_req.frame_id,
                               is_extended_id=self._obd_req.frame_id >= 2**1,
                               data=data)
+        response_complete = False
+        partial_responses = 0
         response = None
         signal = None
         self.bus.send(request)
         attempts = 0
-        while response is None and attempts < 3:
+        max_attempts = 3
+        if mode == 9 and pid == 2:
+            max_attempts += self.vin_message_count
+        while not response_complete and attempts < max_attempts:
             attempts += 1
             response = self.bus.recv(timeout=self.scan_timeout)
             if response:
-                try:
-                    response_time = time.time()
+                response_time = time.time()
+                if mode == 9 and pid == 2:
+                    _log.info('Parsing multi-message response')
+                    partial_responses += 1
+                    _log.warning('Not implemented'
+                                 f' - message part {partial_responses}'
+                                 f'{response}')
+                    vin += self._parse_vin_part(response.data, partial_responses)
+                    if partial_responses == self.vin_message_count:
+                        response_complete = True
+                        signal = ObdSignal(1, pid, vin, ts=response_time)
+                else:
                     decoded = self._db.decode_message(response.arbitration_id,
                                                       response.data)
                     _log.debug(f'CANbus received: {decoded}')
-                    pid = ObdSignal.get_pid_by_name(decoded[pid_mux])
-                    value = decoded[ObdSignal.get_name_by_pid(pid)]
-                    signal = ObdSignal(1, pid, value, response_time)
-                except Exception as err:
-                    _log.error(err)
+                    if pid_mux not in decoded:
+                        continue
+                    rx_mode = decoded['service'].value
+                    rx_pid = decoded[pid_mux].value
+                    value = decoded[ObdSignal.get_name_by_pid(rx_pid, rx_mode)]
+                    if rx_mode == 9 and rx_pid == 1:
+                        self.vin_message_count = value
+                    signal = ObdSignal(mode, rx_pid, value, response_time)
+        if not signal:
+            _log.warning(f'No response received for mode {mode} PID {pid}')
         return signal
+    
+    def _parse_vin_part(self, data: bytes, part: int) -> str:
+        if part == 1:
+            vin_part_bytes = data[5:8]
+        else:
+            vin_part_bytes = data[1:]
+        vin_part = ''.join(chr(c) for c in vin_part_bytes)
+        _log.warning('VIN parsing not implemented')
+        return vin_part

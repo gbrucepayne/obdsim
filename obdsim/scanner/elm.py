@@ -3,8 +3,8 @@ import logging
 import time
 
 from obdsim.elm import Elm327, ElmStatus
-from obdsim.obdsignal import ObdSignal
-from obdsim.scanners import ObdScanner
+
+from .base_scanner import ObdScanner, ObdSignal
 
 _log = logging.getLogger(__name__)
 

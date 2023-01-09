@@ -9,10 +9,11 @@ from cantools.database import Database as CanDatabase
 from cantools.database import Message as CanMessage
 from cantools.database import load_file as load_can_database
 
-from .obdsignal import ObdSignal
+from obdsim.obdsignal import ObdSignal
 
 DBC_FILE = os.getenv('DBC_FILE', './dbc/python-obd.dbc')
-DBC_MSG_NAME = os.getenv('DBC_MSG_NAME', 'OBD2_REQUEST')
+DBC_REQUEST = os.getenv('DBC_REQUEST', 'OBD2_REQUEST')
+DBC_RESPONSE = os.getenv('DBC_RESPONSE', 'OBD2_ECU_RESPONSE')
 
 _log = logging.getLogger(__name__)
 
@@ -35,7 +36,8 @@ class ObdScanner:
                  scan_interval: float = 1.0,
                  scan_timeout: float = 0.1,
                  dbc_filename: str = DBC_FILE,
-                 dbc_msgname: str = DBC_MSG_NAME,
+                 dbc_request: str = DBC_REQUEST,
+                 dbc_response: str = DBC_RESPONSE,
                  ) -> None:
         """Instantiates the class.
         
@@ -45,18 +47,22 @@ class ObdScanner:
             dbc_filename: The file path/name of the DBC to be used.
                 Can be set using environment variable `DBC_FILE`.
                 Defaults to `./dbc/python-obd.dbc`
-            dbc_msgname: The name of the request message set in the `BO_`
+            dbc_request: The name of the request message set in the `BO_`
+                definition within the DBC file.
+            dbc_response: The name of the response message set in the `BO_`
                 definition within the DBC file.
         
         """
         self.scan_interval = scan_interval
         self.scan_timeout = scan_timeout
         self._db: CanDatabase = load_can_database(dbc_filename)
-        self._obd_message: CanMessage = self._db.get_message_by_name(dbc_msgname)
+        self._obd_req: CanMessage = self._db.get_message_by_name(dbc_request)
+        self._obd_res: CanMessage = self._db.get_message_by_name(dbc_response)
         self._pids_supported: 'dict[list[int]]' = {}
         # _signals as [mode][pid] = ObdSignal
         self._signals: dict = {}
         self._running = False
+        self.vin_message_count: int = 0   #: populated by query(mode=9, pid=1)
     
     @property
     def pids_supported(self) -> 'dict[list[int]]':
@@ -69,17 +75,22 @@ class ObdScanner:
         return self._signals
     
     def connect(self):
-        """Connects to the vehicle OBD2 bus.
-        
-        Overwrite with specific method in subclass.
-        """
+        """Connects to the vehicle OBD2 bus."""
         raise NotImplementedError('Subclass must provide connect method.')
+    
+    @property
+    def is_connected(self) -> bool:
+        """Indicates if vehicle is connected and available for queries."""
+        raise NotImplementedError('Subclass must provide is_connected property')
     
     def start(self):
         """Starts OBD scanning."""
+        _log.info('Starting PID scanning')
         self._pids_supported = { 1: [] }
         self._signals = { 1: {} }
         self._get_pids_supported()
+        if not self.pids_supported:
+            raise ConnectionError('Unable to determine supported PIDs')
         _log.info(f'PIDs supported: {self.pids_supported}')
         self._running = True
         self._loop()
@@ -89,16 +100,18 @@ class ObdScanner:
         self._running = False
     
     def query(self, pid: int, mode: int = 1) -> ObdSignal:
-        """Queries a specific PID with optional mode.
-        
-        Overwrite with specific method in subclass.
-        """
+        """Queries a specific PID with optional mode."""
         raise NotImplementedError('Subclass must provide query method.')
     
     def _get_pids_supported(self):
         """Queries the vehicle bus for supported PIDs."""
+        # if not self.is_connected:
+        #     _log.warning('Vehicle is not connected - skipping')
+        #     self._pids_supported = {}
+        #     return
         pid_commands = {
             1: ['PIDS_A', 'PIDS_B', 'PIDS_C'],
+            # 9: [],
         }
         for mode, cmds in pid_commands.items():
             for cmd in cmds:

@@ -8,7 +8,7 @@ sys.path.append(f'{os.getcwd()}')
 
 from obdsim.bluetooth.ble import BleUartBridge, scan_ble
 from obdsim.bluetooth.btc import scan_btc, pair_with_pin
-from obdsim.scanners import ElmScanner
+from obdsim.scanner import ElmScanner
 from obdsim.elm import ElmProtocol
 
 DEVICE_UNDER_TEST = os.getenv('DEVICE_UNDER_TEST')

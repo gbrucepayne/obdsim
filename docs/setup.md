@@ -27,9 +27,20 @@ I wanted to find a way to automate all that.
 
 ## DBC File
 
-### Resources
+A DBC file provides a (semi) standardized way to represent signal encoding for
+a CANbus network. There are many open-source community examples of DBC files
+for various vehicles but the original manufacturer documents are difficult to
+obtain.
 
-* http://mcu.so/Microcontroller/Automotive/DBC_File_Format_Documentation.pdf
+Borrowing from the CSS Electronics open source example, I made some tweaks to
+have the PID names align with what is used in `python-OBD` to be able to use
+that library where appropriate.
+
+### DBC Resources
+
+* [CSS Electronics: A simple intro to DBC](https://www.csselectronics.com/pages/can-dbc-file-database-intro)
+* [DBC File Format v1/2007](http://mcu.so/Microcontroller/Automotive/DBC_File_Format_Documentation.pdf)
+* [Vector Extended Signal Multiplexing](https://cdn.vector.com/cms/content/know-how/_application-notes/AN-ION-1-0521_Extended_Signal_Multiplexing.pdf)
 
 ## Python CAN BUS tools
 
