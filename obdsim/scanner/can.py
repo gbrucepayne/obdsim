@@ -94,15 +94,14 @@ class CanScanner(ObdScanner):
             if response:
                 response_time = time.time()
                 if mode == 9 and pid == 2:
-                    _log.info('Parsing multi-message response')
                     partial_responses += 1
-                    _log.warning('Not implemented'
-                                 f' - message part {partial_responses}'
-                                 f'{response}')
-                    vin += self._parse_vin_part(response.data, partial_responses)
+                    _log.debug('Parsing multi-message response'
+                               f' part {partial_responses}: {response}')
+                    vin += self._parse_vin_part(response.data,
+                                                partial_responses)
                     if partial_responses == self.vin_message_count:
                         response_complete = True
-                        signal = ObdSignal(1, pid, vin, ts=response_time)
+                        signal = ObdSignal(mode, pid, vin, ts=response_time)
                 else:
                     decoded = self._db.decode_message(response.arbitration_id,
                                                       response.data)
@@ -125,5 +124,5 @@ class CanScanner(ObdScanner):
         else:
             vin_part_bytes = data[1:]
         vin_part = ''.join(chr(c) for c in vin_part_bytes)
-        _log.warning('VIN parsing not implemented')
+        _log.warning('VIN parsing not fully tested')
         return vin_part
