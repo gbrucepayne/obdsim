@@ -2,21 +2,34 @@
 import logging
 import os
 import threading
-import time
 
 import can
 from cantools.database import Database as CanDatabase
 from cantools.database import Message as CanMessage
 from cantools.database import load_file as load_can_database
 
-from obdsim.obdsignal import ObdSignal, encode_pids_supported
+from obdsim.obdsignal import ObdSignal, ObdSupportedPids
 
 DBC_FILE = os.getenv('DBC_FILE', './dbc/python-obd.dbc')
 DBC_REQUEST = os.getenv('DBC_REQUEST', 'OBD2_REQUEST')
 DBC_RESPONSE = os.getenv('DBC_RESPONSE', 'OBD2_ECU_RESPONSE')
 SIMULATOR_VIN = os.getenv('SIMULATOR_VIN', '1OBDIISIMULATORXX')
 
-SIMULATED_SIGNALS = ['RPM', 'SPEED']
+SIMULATED_SIGNALS = {
+    'S1_PIDS_01_20': None,
+    'S1_PIDS_21_40': None,
+    'S1_PIDS_41_60': None,
+    'S1_PIDS_61_80': None,
+    'S1_PIDS_81_A0': None,
+    'S1_PIDS_A1_C0': None,
+    'S1_PIDS_C1_E0': None,
+    'ENGINE_SPEED': 0,
+    'VEHICLE_SPEED': 0,
+    'OIL_TEMP': 20 + 40,
+    'S9_PIDS_01_20': None,
+    'VIN_MCOUNT': 3,
+    'VIN': SIMULATOR_VIN,
+}
 
 _log = logging.getLogger(__name__)
 
@@ -122,59 +135,15 @@ class ObdSimulator:
             'service': service_mode,
             pid_mux: pid,
         }
-        if service_mode == 1:
-            _log.debug(f'Simulating mode 1 response')
-            if pid == 0:
-                response['length'] = 6
-                response['PIDS_A'] = self.pids_supported(0)
-            elif pid == 0xC:
-                if 'RPM' not in self.signals:
-                    self.signals['RPM'] = 1165
-                response['length'] = 4
-                response['RPM'] = self.signals['RPM']
-            elif pid == 0xD:
-                if 'SPEED' not in self.signals:
-                    self.signals['SPEED'] = 50
-                response['length'] = 3
-                response['SPEED'] = self.signals['SPEED']
-            else:
-                _log.warning(f'Unhandled Mode 01 PID {pid}')
-                response = None
-        elif service_mode == 9:
-            if pid == 0:
-                response['length'] = 6
-                response['S9_PIDS_01_20'] = encode_pids_supported(0, [1, 2])
-            elif pid == 1:
-                response['length'] = 3
-                response['S9_VIN_MCOUNT'] = 3
-            elif pid == 2:
-                if len(SIMULATOR_VIN) != 17:
-                    _log.warning(f'Invalid VIN {SIMULATOR_VIN}')
-                vin_parts = (
-                    SIMULATOR_VIN[:3],
-                    SIMULATOR_VIN[3:10],
-                    SIMULATOR_VIN[10:17]
-                )
-                for i, part in enumerate(vin_parts):
-                    if i == 0:
-                        data_hex = '1014490201'
-                    else:
-                        data_hex = f'{20 + i}'
-                    for c in part:
-                        data_hex += f'{ord(c):02x}'.upper()
-                    data = bytes.fromhex(data_hex)
-                    _log.debug(f'Sending VIN part {i + 1} of {len(vin_parts)}')
-                    self.send_response_data(data, extended_id)
-                return
-                # raise NotImplementedError('TODO mode 9 pid 2 VIN multi-line')
+        response = self.sim_response(service_mode, pid, response)
+        if response is None:
+            return
+        if 'length' not in response:
+            _log.warning(f'No simulation for mode {service_mode} PID {pid}')
         else:
-            response = None
-        if response:
             _log.info(f'Simulating response: {response}')
             data = self._obd_res.encode(response)
             self.send_response_data(data, extended_id)
-        else:
-            _log.warning(f'No response for {request}')
 
     def send_response_data(self, data: bytes, extended_id: bool = None):
         """Sends a response message on the CANbus."""
@@ -186,17 +155,56 @@ class ObdSimulator:
         _log.debug(f'Sending raw CAN data: {message}')
         self._bus.send(message)
         
-    def pids_supported(self, pid: int) -> int:
+    def pids_supported(self, pid: int, mode: int = 1) -> int:
         """Generates the bitmask for a response to supported pids 0x01-0x20
         
         Returns:
             Integer of the 32-bit bitmask.
             
         """
-        signals = self.signals or SIMULATED_SIGNALS
         supported = []
-        for signal in signals:
-            candidate_pid = ObdSignal.get_pid_by_name(signal)
-            if candidate_pid and candidate_pid <= pid + 32:
+        for sim in SIMULATED_SIGNALS:
+            candidate_pid = ObdSignal.get_pid_by_name(sim, mode)
+            if candidate_pid and candidate_pid in range(pid + 1, pid + 32 + 1):
                 supported.append(candidate_pid)
-        return encode_pids_supported(pid, supported)
+        o = ObdSupportedPids(mode, pid)
+        o.pids = supported
+        return o.value
+
+    def sim_response(self, mode: int, pid: int, response: dict) -> 'dict|None':
+        """Populates the response dictionary"""
+        pid_name = ObdSignal.get_name_by_pid(pid, mode)
+        if pid_name not in SIMULATED_SIGNALS:
+            _log.warning(f'Unsupported mode {mode} pid {pid}')
+            return
+        if pid_name not in self.signals or self.signals[pid_name] is None:
+            if '_PIDS_' in pid_name:
+                self.signals[pid_name] = self.pids_supported(pid, mode)
+            else:
+                self.signals[pid_name] = SIMULATED_SIGNALS[pid_name]
+        if pid_name.endswith('VIN'):
+            self.sim_vin()
+            return None
+        signal = ObdSignal(mode, pid, self.signals[pid_name])
+        response['length'] = signal.length
+        response[pid_name] = signal.value_raw
+        return response
+        
+    def sim_vin(self, extended_id: bool = None):
+        if len(SIMULATOR_VIN) != 17:
+            _log.warning(f'Invalid VIN {SIMULATOR_VIN}')
+        vin_parts = (
+            SIMULATOR_VIN[:3],
+            SIMULATOR_VIN[3:10],
+            SIMULATOR_VIN[10:17]
+        )
+        for i, part in enumerate(vin_parts):
+            if i == 0:
+                data_hex = '1014490201'
+            else:
+                data_hex = f'{20 + i}'
+            for c in part:
+                data_hex += f'{ord(c):02x}'.upper()
+            data = bytes.fromhex(data_hex)
+            _log.debug(f'Sending VIN part {i + 1} of {len(vin_parts)}')
+            self.send_response_data(data, extended_id)

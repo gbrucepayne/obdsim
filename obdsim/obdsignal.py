@@ -1,8 +1,11 @@
 """A model for simulated OBD2 PID signals."""
 import time
+from dataclasses import dataclass
 from enum import IntEnum
+from typing import Any
 
 import pint
+
 # from pint.unit import ScaleConverter, UnitDefinition
 
 ureg = pint.UnitRegistry()
@@ -36,8 +39,8 @@ def decode_pids_supported(mode: int,
         
     """
     supported = []
-    bitmask = f'{value:032b}'
-    for i, bit in enumerate(reversed(bitmask)):
+    bitmask_str = f'{value:032b}'
+    for i, bit in enumerate(reversed(bitmask_str)):
         if bit == '1':
             supported.append(pid + i + 1)
     supported.sort()
@@ -70,20 +73,84 @@ def encode_pids_supported(pid: int, pid_list: 'list[int]') -> int:
     return bitmask
 
 
+@dataclass
+class ObdSupportedPids:
+    """A class representing a supported PIDS bitmask."""
+    mode: int
+    pid: int
+    value: int = 0
+    
+    @property
+    def pids(self) -> 'list[int]':
+        supported = []
+        bitmask_str = f'{self.value:032b}'
+        for i, bit in enumerate(reversed(bitmask_str)):
+            if bit == '1':
+                supported.append(self.pid + i + 1)
+        supported.sort()
+        return supported
+    
+    @pids.setter
+    def pids(self, pid_list: 'list[int]'):
+        if any(p not in range(0, 256) for p in pid_list):
+            raise ValueError('Invalid PID in list')
+        if any(p > self.pid + 32 for p in pid_list):
+            raise ValueError('PIDs in list must be within 32 of reference pid')
+        bitmask = 0
+        for p in list(set(pid_list)):
+            bitmask = bitmask | 1 << (p - self.pid - 1)
+        self.value = bitmask
+
+
 class ObdIgnitionType(IntEnum):
     SPARK = 0
     COMPRESSION = 1
 
 
+@dataclass
 class ObdStatus:
-    def __init__(self,
-                 mil: bool,
-                 dtc_count: int,
-                 ignition_type: ObdIgnitionType,
-                 ) -> None:
-        self.mil = mil
-        self.dtc_count = dtc_count
-        self.ignition_type = ignition_type
+    """A class representing OBD Status."""
+    mil: bool
+    dtc_count: int
+    ignition_type: ObdIgnitionType
+
+
+@dataclass
+class ObdPidDefinition:
+    """A class representing a PID definition."""
+    mode: int
+    pid: int
+    length: int
+    name: str
+    data_type: Any
+    scale: float = 1
+    offset: int = 0
+    unit: Any = None
+
+
+@dataclass
+class ObdVin:
+    """"""
+    packet_number: int
+    packet_value: str
+
+
+PID_DEFINITIONS: 'list[ObdPidDefinition]' = [
+    ObdPidDefinition(0x1, 0x00, 6, 'S1_PIDS_01_20', ObdSupportedPids),
+    ObdPidDefinition(0x1, 0x20, 6, 'S1_PIDS_21_40', ObdSupportedPids),
+    ObdPidDefinition(0x1, 0x40, 6, 'S1_PIDS_41_60', ObdSupportedPids),
+    ObdPidDefinition(0x1, 0x60, 6, 'S1_PIDS_61_80', ObdSupportedPids),
+    ObdPidDefinition(0x1, 0x80, 6, 'S1_PIDS_81_A0', ObdSupportedPids),
+    ObdPidDefinition(0x1, 0xA0, 6, 'S1_PIDS_A1_C0', ObdSupportedPids),
+    ObdPidDefinition(0x1, 0x01, 6, 'STATUS', ObdStatus),
+    ObdPidDefinition(0x1, 0x0C, 4, 'ENGINE_SPEED', int, 0.25, 0, ureg.rpm),
+    ObdPidDefinition(0x1, 0x0D, 3, 'VEHICLE_SPEED', int, 1, 0, ureg.kph),
+    ObdPidDefinition(0x1, 0x21, 4, 'DISTANCE_W_MIL', int, 1, 0, ureg.km),
+    ObdPidDefinition(0x1, 0x5C, 3, 'OIL_TEMP', int, 1, -40, ureg.degC),
+    ObdPidDefinition(0x9, 0x00, 6, 'S9_PIDS_01_20', ObdSupportedPids),
+    ObdPidDefinition(0x9, 0x01, 4, 'VIN_MCOUNT', int, 1, 0, ureg.count),
+    ObdPidDefinition(0x9, 0x02, 6, 'VIN', ObdVin),
+]
 
 
 class ObdSignal:
@@ -98,21 +165,7 @@ class ObdSignal:
         ts (float): The (unix) timestamp of the measurement.
         
     """
-    PID_DEFINITIONS = [
-        # (mode, pid, name, unit/type, bytes)
-        (0x1, 0x0, 'PIDS_A', 'bitmask', 4),
-        (0x1, 0x1, 'STATUS', ObdStatus),
-        # (0x1, 0x2, 'FREEZE_DTC', 'FreezeDtc'),
-        # (0x1, 0x3, 'FUEL_STATUS', tuple[str, str]),
-        (0x1, 0x4, 'ENGINE_LOAD', ureg.percent),
-        (0x1, 0xc, 'RPM', ureg.rpm),
-        (0x1, 0xd, 'SPEED', ureg.kph),
-        (0x9, 0x0, 'S9_PIDS_01_20', 'bitmask', 4),
-        (0x9, 0x1, 'S9_VIN_MCOUNT', ureg.count, 4),
-        (0x9, 0x0, 'S9_VIN', None, 4),
-    ]
-    
-    def __init__(self, mode: int, pid: int, value, ts: float = None) -> None:
+    def __init__(self, mode: int, pid: int, value: Any, ts: float = None) -> None:
         """Creates an ObdSignal.
         
         Args:
@@ -124,86 +177,81 @@ class ObdSignal:
         """
         self.mode: int = mode
         self.pid: int = pid
+        self.pid_def: ObdPidDefinition = None
+        for pid_def in PID_DEFINITIONS:
+            if pid_def.mode == mode and pid_def.pid == pid:
+                self.pid_def = pid_def
+                break
+        if self.pid_def is None:
+            raise ValueError(f'Undefined PID {pid} (mode {mode})')
+        self._data_type = None
         self._length: int = 0
-        self._value = value
+        self._value = None
         self.ts: float = ts or time.time()
+        self.value = value
 
     @classmethod
     def get_pid_by_name(cls, name: str, mode: int = 1) -> 'int|None':
-        for pid_def in cls.PID_DEFINITIONS:
-            if pid_def[2] == name and pid_def[0] == mode:
-                return pid_def[1]
+        for pid_def in PID_DEFINITIONS:
+            if pid_def.name == name and pid_def.mode == mode:
+                return pid_def.pid
         
     @classmethod
     def get_name_by_pid(cls, pid: int, mode: int = 1) -> 'str|None':
-        for pid_def in cls.PID_DEFINITIONS:
-            if pid_def[1] == pid and pid_def[0] == mode:
-                return pid_def[2]
+        for pid_def in PID_DEFINITIONS:
+            if pid_def.pid == pid and pid_def.mode == mode:
+                return pid_def.name
         
     @property
     def name(self) -> str:
-        for pid_def in self.PID_DEFINITIONS:
-            if pid_def[0] == self.mode and pid_def[1] == self.pid:
-                return pid_def[2]
+        return self.pid_def.name
     
     @property
     def unit(self):
-        for pid_def in self.PID_DEFINITIONS:
-            if pid_def[0] == self.mode and pid_def[1] == self.pid:
-                return pid_def[3]
+        return self.pid_def.unit
         
+    @property
+    def length(self) -> int:
+        return self.pid_def.length
+    
     @property
     def value_raw(self):
         return self._value
     
     @property
-    def value(self) -> ureg.Quantity:
-        if self.unit == 'bitmask':
-            pid_list = decode_pids_supported(self.mode, self.pid, self._value)
-            return pid_list[self.mode]
-        elif isinstance(self.unit, ObdStatus):
-            raise NotImplementedError
-        elif self.unit == ureg.percent:
-            return self._value * ureg.percent
-        elif self.unit == ureg.rpm:
-            return self._value * ureg.rpm
-        elif self.unit == ureg.kph:
-            return self._value * ureg.kph
-        # elif self.pid in PIDS_UNIT_DEGREE:
-        #     return self._value * ureg.degree
-        # elif self.pid in PIDS_UNIT_GPS:
-        #     return self._value * ureg.grams_per_second
-        # elif self.pid in PIDS_UNIT_V:
-        #     return self._value * ureg.volt
-        # elif self.pid in PIDS_UNIT_SEC:
-        #     return self._value * ureg.second
-        # elif self.pid in PIDS_UNIT_KM:
-        #     return self._value * ureg.kilometer
-        # elif self.pid in PIDS_UNIT_COUNT:
-        #     return self._value * ureg.count
-        # elif self.pid in PIDS_UNIT_PASCAL:
-        #     return self._value * ureg.pascal
-        # elif self.pid in PIDS_UNIT_MA:
-        #     return self._value * ureg.milliamp
-        # elif self.pid in PIDS_UNIT_RATIO:
-        #     return self._value * ureg.ratio
-        # elif self.pid in PIDS_UNIT_MIN:
-        #     return self._value * ureg.minute
-        # elif self.pid in PIDS_UNIT_LPH:
-        #     return self._value * ureg.litre_per_hour
-        # elif self.pid in PIDS_STRING:
-        #     return str(self._value)
-        else:
-            return self._value
+    def value(self) -> Any:
+        if self.pid_def.data_type.__name__ == 'ObdSupportedPids':
+            return ObdSupportedPids(self.mode, self.pid, self._value).pids
+        if self.pid_def.data_type.__name__ == 'int':
+            return self.pid_def.offset + self.pid_def.scale * self._value
+        return self._value
     
     @value.setter
     def value(self, value):
-        raise NotImplementedError
-    
+        if self.pid_def.data_type.__name__ == 'ObdSupportedPids':
+            if isinstance(value, int):
+                self._value = value
+            elif isinstance(value, list):
+                if any(p not in range(0, 256) for p in value):
+                    raise ValueError('Invalid list of PIDs')
+                obj = ObdSupportedPids(self.mode, self.pid)
+                obj.pids = value
+                self._value = obj.value
+            else:
+                raise ValueError(f'Unexpected data type {type(value)}')
+        elif self.pid_def.data_type.__name__ == 'int':
+            self._value = int((value - self.pid_def.offset) /
+                              self.pid_def.scale)
+        elif self.pid_def.data_type.__name__ == 'ObdVin':
+            if not isinstance(value, str) or len(value) != 17:
+                raise ValueError('Invalid VIN')
+        self._value = value
+
     @property
-    def length(self) -> int:
-        # TODO: populate length for different parameters
-        return self._length
+    def quantity(self) -> Any:
+        if self.pid_def.data_type.__name__ == 'int':
+            return Q_(self.value, self.pid_def.unit)
+        return self.value
 
 
 def pid_definitions(dbc_filename: str) -> 'list':

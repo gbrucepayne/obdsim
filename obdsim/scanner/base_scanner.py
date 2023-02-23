@@ -58,7 +58,7 @@ class ObdScanner:
         self._db: CanDatabase = load_can_database(dbc_filename)
         self._obd_req: CanMessage = self._db.get_message_by_name(dbc_request)
         self._obd_res: CanMessage = self._db.get_message_by_name(dbc_response)
-        self._pids_supported: 'dict[list[int]]' = {}
+        self._scan_pids: 'dict[list[int]]' = {}
         # _signals as [mode][pid] = ObdSignal
         self._signals: dict = {}
         self._running = False
@@ -67,7 +67,7 @@ class ObdScanner:
     @property
     def pids_supported(self) -> 'dict[list[int]]':
         """PIDS supported by the vehicle."""
-        return self._pids_supported
+        return self._scan_pids
     
     @property
     def signals(self) -> 'dict[dict[ObdSignal]]':
@@ -86,7 +86,7 @@ class ObdScanner:
     def start(self):
         """Starts OBD scanning."""
         _log.info('Starting PID scanning')
-        self._pids_supported = { 1: [] }
+        self._scan_pids = { 1: [] }
         self._signals = { 1: {} }
         self._get_pids_supported()
         if not self.pids_supported:
@@ -109,24 +109,27 @@ class ObdScanner:
         #     _log.warning('Vehicle is not connected - skipping')
         #     self._pids_supported = {}
         #     return
-        pid_commands = {
-            1: ['PIDS_A', 'PIDS_B', 'PIDS_C'],
-            # 9: [],
-        }
-        for mode, cmds in pid_commands.items():
-            for cmd in cmds:
-                if mode not in self._pids_supported:
-                    self._pids_supported[mode] = []
-                pid = ObdSignal.get_pid_by_name(cmd)
-                if pid is None:
-                    _log.warning(f'{cmd} undefined - skipping')
-                    continue
+        for mode in [1]:
+            if mode not in self._scan_pids:
+                self._scan_pids[mode] = []
+            pid = 0
+            while True:
                 response = self.query(pid, mode)
-                for pid in response.value:
-                    pids_supported: list = self._pids_supported[mode]
-                    if pid not in pids_supported:
-                        pids_supported.append(pid)
-                    pids_supported.sort()
+                if (not isinstance(response, ObdSignal) or
+                    not isinstance(response.value, list)):
+                    _log.warning(f'Invalid response for mode {mode} pid {pid}')
+                    break
+                for supported_pid in response.value:
+                    pids_supported: 'list[int]' = self._scan_pids[mode]
+                    if not supported_pid in pids_supported:
+                        if supported_pid == pid + 32:
+                            continue
+                        pids_supported.append(supported_pid)
+                        pids_supported.sort()
+                if (pid + 32) not in response.value:
+                    break
+                pid += 32
+        _log.info(f'PIDs to scan: {self._scan_pids}')
         
     def _loop(self):
         """Loops through supported pids querying and populating signals.
@@ -141,7 +144,7 @@ class ObdScanner:
                         mode not in self._signals):
                         # create mode signals dictionary
                         self._signals[mode] = {}
-                    self._signals[mode][pid] = signal.value
+                    self._signals[mode][pid] = signal.quantity
                     _log.info(f'Updated [{mode}][{pid}] "{signal.name}"'
                               f' = {self._signals[mode][pid]}')
         time.sleep(self.scan_interval)
